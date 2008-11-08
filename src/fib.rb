@@ -1,3 +1,5 @@
+require 'binstruct'
+
 class WordFIB < BinStruct
 
 	unsigned :wIdent, 16, "0 Magic number"

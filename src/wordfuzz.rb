@@ -96,60 +96,62 @@ idle_word_pruner=Thread.new do
 end
 =end
 1.times do
-		Thread.new do
+	Thread.new do
+		begin
+			loop do
 				begin
-						loop do
-								begin
-										data=nil
-										loop do
-												queue_mutex.synchronize {
-													data=send_queue.pop unless send_queue.empty?
-												}
-												if data
-														break
-												else
-														sleep(rand(5))
-												end
-										end
-										Thread.current[:conn]=Connector.new(CONN_OFFICE, 'word')
-										Thread.current[:data]=data
-										sent+=1
-										Thread.current[:conn].deliver data
-										unless Thread.current[:conn].connected?
-											  print "[1-#{sent}-1]";$stdout.flush
-											  File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-											  Thread.current[:conn].close if Thread.current[:conn]
-										end
-										print(".");$stdout.flush
-										if sent%100==0
-												GC.start
-												print "<#{sent}>";$stdout.flush
-										end
-								rescue 
-										if $!.message =~ /Crash!!/m
-											  print "[2-#{sent}-2]";$stdout.flush
-											  File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-										else
-												print "#";$stdout.flush
-										end
-										if sent%100==0
-												GC.start
-												print "<#{sent}>";$stdout.flush
-										end
-										retry
-								ensure
-										Thread.current[:conn].close if Thread.current[:conn]
-										Thread.current[:conn]=nil
-								end
+					data=nil
+					loop do
+						queue_mutex.synchronize {
+							data=send_queue.pop unless send_queue.empty?
+						}
+						if data
+							break
+						else
+							sleep(rand(5))
 						end
-				rescue
-						print "[3-#{sent}-3]";$stdout.flush
-						#File.open("3crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-						Thread.current[:conn].close if Thread.current[:conn]
-						#Thread.current.exit
-						retry
+					end
+					Thread.current[:conn]=Connector.new(CONN_OFFICE, 'word')
+					Thread.current[:data]=data
+					sent+=1
+					Thread.current[:conn].deliver data
+					unless Thread.current[:conn].connected?
+						print "[1-#{sent}-1]";$stdout.flush
+						File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+						Thread.current[:conn]=nil
+					end
+					print(".");$stdout.flush
+					if sent%100==0
+						GC.start
+						print "<#{sent}>";$stdout.flush
+					end
+				rescue 
+					if $!.message =~ /Crash!!/m
+						print "[2-#{sent}-2]";$stdout.flush
+						File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+					else
+						print "#";$stdout.flush
+					end
+					if sent%100==0
+						GC.start
+						print "<#{sent}>";$stdout.flush
+					end
+					Thread.current[:conn].close if Thread.current[:conn]
+					Thread.current[:conn]=nil
+					retry
+				ensure
+					Thread.current[:conn].close if Thread.current[:conn]
+					Thread.current[:conn]=nil
 				end
+			end
+		rescue
+			print "[3-#{sent}-3]";$stdout.flush
+			#File.open("3crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+			Thread.current[:conn].close if Thread.current[:conn]
+			Thread.current[:conn]=nil
+			retry
 		end
+	end
 end
 at_exit {puts "Exiting... #{sent}"}
 sleep(1) until production_finished and send_queue.empty?
