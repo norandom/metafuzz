@@ -68,7 +68,7 @@ module CONN_OFFICE
 			File.open(path, "wb+") {|io| io.write(data)}
 			@app.Documents.Open(path) # this call blocks, so if it opens a dialog box immediately we lose control of the app.
 		rescue
-			if $!.message =~ /OLE error code:0 /m and not $!.message =~ /OLE error code:0 .*unavailable/m# the OLE server threw an exception, should be a genuine crash.
+			if $!.message =~ /OLE error code:0 /m #and not $!.message =~ /OLE error code:0 .*unavailable/m# the OLE server threw an exception, should be a genuine crash.
 				puts $!;$stdout.flush
 				raise RuntimeError, "CONN_OFFICE: Crash!! #{$!}"
 			else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.

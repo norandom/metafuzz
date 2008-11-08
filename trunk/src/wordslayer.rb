@@ -11,7 +11,13 @@
 				if p.Name=="WINWORD.EXE" or p.Name=="DW20.EXE" #or p.Name=="WerFault.exe"
 					if word_instances[p.ProcessId] > 1
 						print "[!#{p.ProcessId}!]";$stdout.flush
-						Process.kill(1, p.ProcessId)
+						begin
+							Process.kill(1, p.ProcessId)
+						rescue
+							puts $!
+							puts p.Name
+							exit
+						end
 						word_instances.delete(p.ProcessId)
 					else
 						word_instances[p.ProcessId]+=1
