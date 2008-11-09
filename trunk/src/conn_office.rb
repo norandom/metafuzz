@@ -70,7 +70,7 @@ module CONN_OFFICE
             # this call blocks, so if it opens a dialog box immediately we lose control of the app. 
             # This is the biggest issue, and so far can only be solved with a separate monitor app
             # that kills word processes that are hanging here.
-            @app.Documents.Open(path)
+            @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
         rescue
             if $!.message =~ /OLE error code:0 /m #and not $!.message =~ /OLE error code:0 .*unavailable/m# the OLE server threw an exception, should be a genuine crash.
                 puts $!;$stdout.flush
@@ -95,7 +95,7 @@ module CONN_OFFICE
     #Cleanly destroy the app. 
     def destroy_connection
         begin
-            @app.Documents.each {|doc| doc.close rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
+            @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
             begin
                 if is_connected?
                     @app.Quit #Sometimes this opens an alert box "You can't close because a dialog box is open..."
