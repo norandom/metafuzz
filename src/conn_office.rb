@@ -105,12 +105,12 @@ module CONN_OFFICE
                         Process.kill(1,@pid)
                     rescue
                         # This could be a little neater
-                        puts $!
+                        puts "CONN_OFFICE: destroy_connection failed to kill: #{$!}"
                         nil# maybe it died in the meantime?
                     end
                 end
             rescue
-                puts $!
+                puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
             end
         ensure
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
