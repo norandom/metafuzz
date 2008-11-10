@@ -130,7 +130,6 @@ end
                     Thread.current[:conn].close if Thread.current[:conn]
                     Thread.current[:conn]=nil
                 rescue 
-                    puts $!
                     if $!.message =~ /Crash!!/m
                         print "[2-#{sent}-2]";$stdout.flush
                         File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
