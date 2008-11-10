@@ -49,7 +49,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         g=Generators::RollingCorrupt.new(raw_fib,16,8)
-        500.times do
+        1500.times do
             g.next
         end
         while g.next?
@@ -105,14 +105,16 @@ end
                         queue_mutex.synchronize {
                             data=send_queue.pop unless send_queue.empty?
                         }
-                        if data
-                            break
-                        else
-                            sleep(rand(5))
-                        end
+                        break if data
+                        sleep(rand(5))
                     end
-                    Thread.current[:conn]=Connector.new(CONN_OFFICE, 'word')
                     Thread.current[:data]=data
+                    loop do
+                        Thread.current[:conn]=Connector.new(CONN_OFFICE, 'word')
+                        break if Thread.current[:conn].connected?
+                        Thread.current[:conn]=nil
+                        sleep(rand(5))
+                    end
                     sent+=1
                     Thread.current[:conn].deliver data
                     unless Thread.current[:conn].connected?
@@ -125,6 +127,8 @@ end
                         GC.start
                         print "<#{sent}>";$stdout.flush
                     end
+                    Thread.current[:conn].close if Thread.current[:conn]
+                    Thread.current[:conn]=nil
                 rescue 
                     if $!.message =~ /Crash!!/m
                         print "[2-#{sent}-2]";$stdout.flush
@@ -139,9 +143,6 @@ end
                     Thread.current[:conn].close if Thread.current[:conn]
                     Thread.current[:conn]=nil
                     retry
-                ensure
-                    Thread.current[:conn].close if Thread.current[:conn]
-                    Thread.current[:conn]=nil
                 end
             end
         rescue

@@ -71,9 +71,9 @@ module CONN_OFFICE
             # This is the biggest issue, and so far can only be solved with a separate monitor app
             # that kills word processes that are hanging here.
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
+            @app.visible
         rescue
-            if $!.message =~ /OLE error code:0 /m #and not $!.message =~ /OLE error code:0 .*unavailable/m# the OLE server threw an exception, should be a genuine crash.
-                puts $!;$stdout.flush
+            if $!.message =~ /Exception/m # the OLE server threw an exception, might be a genuine crash.
                 raise RuntimeError, "CONN_OFFICE: Crash!! #{$!}"
             else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
                 destroy_connection
