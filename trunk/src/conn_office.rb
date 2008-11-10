@@ -73,7 +73,7 @@ module CONN_OFFICE
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
             @app.visible
         rescue
-            if $!.message =~ /.*server.*exception/mi # the OLE server threw an exception, might be a genuine crash.
+            if $!.message =~ /OLE error code:0 .*Exception/m # the OLE server threw an exception, might be a genuine crash.
                 raise RuntimeError, "CONN_OFFICE: Crash!! #{$!}"
             else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
                 destroy_connection
