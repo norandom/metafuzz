@@ -8,12 +8,18 @@ require 'fuzzer'
 prod_queue=SizedQueue.new(20)
 # Quickly patch the queue object to add a finished? method
 # Couldn't think of anything more elegant.
-class << prod_queue # These are not thread safe, suk.
+class << prod_queue
     def finish 
+        Thread.critical=true
         @finished=true
+    ensure
+        Thread.critical=false
     end
     def finished?
+        Thread.critical=true
         @finished||=false
+    ensure
+        Thread.critical=false
     end
 end
 
@@ -37,7 +43,10 @@ module FuzzServer
 
     def post_init
         @handler=NetStringTokenizer.new
-        @production_queue=nil
+    end
+
+    def initialize(prod_queue)
+        @production_queue=prod_queue
     end
 
     def receive_data(data)
@@ -66,13 +75,8 @@ module FuzzServer
         end
     end
 
-    def set_queue(q_obj)
-        @production_queue=q_obj
-    end
 end
 
 EventMachine::run {
-    EventMachine::start_server("0.0.0.0", 10000, FuzzServer) {|c|  
-        c.set_queue(prod_queue)
-    }
+    EventMachine::start_server("0.0.0.0", 10000, FuzzServer, prod_queue)
 }
