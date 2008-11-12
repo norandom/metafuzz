@@ -1,23 +1,32 @@
 require 'rubygems'
 require 'eventmachine'
 require 'em_netstring'
-require 'yaml'
+require 'fuzzprotocol'
 
 module FuzzClient
 
     def post_init
         @handler=NetStringTokenizer.new
         puts "Sending ready.."
-        send_data(@handler.pack("CLIENT READY"))
+        @ready_msg=@handler.pack(FuzzMessage.new({:verb=>"CLIENT READY"}).to_yaml)
+        send_data @ready_msg
     end
 
     def receive_data(data)
         @handler.parse(data).each {|m| 
-            puts "Got YAML Data. Loading..."
-            obj=YAML::load(m)
-            puts "Got #{obj.class} - #{obj.inspect}"
+            puts "Got Data. Loading..."
+            msg=FuzzMessage.new(m)
+            puts "Got #{msg.verb} -- #{msg.data.inspect}"
+            case msg.verb
+            when "DELIVER"
+                puts msg.data
+                send_data @ready_msg
+            when "SERVER FINISHED"
+                EventMachine::stop_event_loop
+            else
+                raise RuntimeError, "Unknown Command!"
+            end
         }
-        EventMachine::stop_event_loop
     end
 end
 
