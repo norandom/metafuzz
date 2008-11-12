@@ -35,7 +35,7 @@ module CONN_OFFICE
         pid=pid.unpack('L')[0]
     end
     private :pid_from_app
-
+    attr_reader :pid
     #Open the application via OLE	
     def establish_connection
         @appname, @path = @module_args
@@ -102,7 +102,7 @@ module CONN_OFFICE
                 end
                 if is_connected? # Still connected! Lay the smack down.
                     begin
-                        Process.kill(1,@pid)
+                        Process.kill(9,@pid) # kill -1 doesn't always work, dunno why.
                     rescue
                         # This could be a little neater
                         puts "CONN_OFFICE: destroy_connection failed to kill: #{$!}"
