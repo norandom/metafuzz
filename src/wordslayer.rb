@@ -25,42 +25,40 @@ def delete_temp_files
 end
 
 def kill_dialog_boxes
+    my_result=WindowOperations::do_enum_windows('classname=~/OpusApp/')
+    my_result.each {|k,v|
+        children=WindowOperations::do_enum_windows("parentwindow==#{k}")
+        v << children
+    }
 
-  my_result=WindowOperations::do_enum_windows('classname=~/OpusApp/')
-my_result.each {|k,v|
-  children=WindowOperations::do_enum_windows("parentwindow==#{k}")
-  v << children
-  }
-
-my_result.each {|k,v|
-    v[3].each {|k,v|
-      if v[2]=~/Show Repairs/
-        WindowOperations::send_window_message(k,WM_DESTROY)
-      end
-      if v[1]=~/32770/
-        alert_stuff=do_child_windows(k)
-
-            switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-            switch_to_window.call(k,1)
-        alert_stuff.each {|k,v|
-          if v[0]=="Button" and v[1]=="OK"
-            WindowOperations::send_window_message(k,BMCLICK)
-          end
-          }
-      end
-      }
-  }
+    my_result.each {|k,v|
+        v[3].each {|k,v|
+            if v[2]=~/Show Repairs/
+                WindowOperations::send_window_message(k,WM_DESTROY)
+            end
+            if v[1]=~/32770/
+                alert_stuff=do_child_windows(k)
+                switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+                switch_to_window.call(k,1)
+                alert_stuff.each {|k,v|
+                    if v[0]=="Button" and v[1]=="OK"
+                        WindowOperations::send_window_message(k,BMCLICK)
+                    end
+                }
+            end
+        }
+    }
 end
 
 dialog_killer=Thread.new do
-loop do 
- begin
-    kill_dialog_boxes 
-    rescue 
-    puts $!
+    loop do 
+        begin
+            kill_dialog_boxes 
+        rescue 
+            puts $!
+        end
+        sleep(0.5)
     end
-  sleep(0.5)
-  end
 end
 
 
