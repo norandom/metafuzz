@@ -2,7 +2,8 @@ require 'win32ole'
 require 'fileutils'
 require 'Win32API'
 require 'win32/process'
-
+require 'windows_manipulation'
+  include WindowOperations
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
@@ -33,9 +34,10 @@ module CONN_OFFICE
         wid=fw.call(0,window_caption)
         gwtpid.call(wid,pid)
         pid=pid.unpack('L')[0]
+        [pid,wid]
     end
     private :pid_from_app
-    attr_reader :pid
+    attr_reader :pid,:wid
     #Open the application via OLE	
     def establish_connection
         @appname, @path = @module_args
@@ -44,7 +46,7 @@ module CONN_OFFICE
         begin
             @app=WIN32OLE.new(@appname+'.Application')
             #@app.visible=true # for now.
-            @pid=pid_from_app(@app)
+            @pid,@wid=pid_from_app(@app)
             @app.DisplayAlerts=0
         rescue
             destroy_connection
@@ -73,8 +75,8 @@ module CONN_OFFICE
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
             @app.visible
         rescue
-            if $!.message =~ /OLE error code:0 .*Exception/m # the OLE server threw an exception, might be a genuine crash.
-                raise RuntimeError, "CONN_OFFICE: Crash!! #{$!}"
+            if $!.message =~ /OLE error code:0 .*Unknown/m # the OLE server threw an exception, might be a genuine crash.
+                raise RuntimeError, "#{@pid}"
             else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
                 destroy_connection
                 raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"
@@ -92,23 +94,20 @@ module CONN_OFFICE
         end		
     end
 
+def dialog_boxes
+  children=WindowOperations::do_enum_windows("parentwindow==#{@wid}")
+  children.length > 0
+end
+
     #Cleanly destroy the app. 
     def destroy_connection
         begin
             @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
-            begin
+           begin
                 if is_connected?
-                    @app.Quit #Sometimes this opens an alert box "You can't close because a dialog box is open..."
-                end
-                if is_connected? # Still connected! Lay the smack down.
-                    begin
-                        Process.kill(9,@pid) # kill -1 doesn't always work, dunno why.
-                    rescue
-                        # This could be a little neater
-                        puts "CONN_OFFICE: destroy_connection failed to kill: #{$!}"
-                        nil# maybe it died in the meantime?
-                    end
-                end
+                    sleep(1) while dialog_boxes
+                    @app.Quit
+                  end
             rescue
                 puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
             end

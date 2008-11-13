@@ -49,7 +49,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         g=Generators::RollingCorrupt.new(raw_fib,16,8)
-        1500.times do
+        2200.times do
             g.next
         end
         while g.next?
@@ -130,9 +130,9 @@ end
                     Thread.current[:conn].close if Thread.current[:conn]
                     Thread.current[:conn]=nil
                 rescue 
-                    if $!.message =~ /Crash!!/m
-                        print "[2-#{sent}-2]";$stdout.flush
-                        File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+                    unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+                        print "<#{$!.message}>";$stdout.flush
+                        #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
                     else
                         print "#";$stdout.flush
                     end
@@ -154,7 +154,7 @@ end
         end
     end
 end
-at_exit {puts "Exiting... #{sent}"}
+at_exit {puts "Exiting... #{sent}";puts $!}
 sleep(1) until production_finished and send_queue.empty?
 
 print "\n"
