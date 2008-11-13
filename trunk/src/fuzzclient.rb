@@ -69,7 +69,7 @@ module FuzzClient
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         send_data @ready_msg
         @connect=EventMachine::DefaultDeferrable.new
-        @connect.timeout(5)
+        @connect.timeout(@config["POLL INTERVAL"])
         @connect.errback do
            puts "Fuzzclient: Connection timed out. Retrying."
            send_client_ready
@@ -80,11 +80,7 @@ module FuzzClient
         @handler=NetStringTokenizer.new
         @ready_msg=@handler.pack(FuzzMessage.new({:verb=>"CLIENT READY",:station_id=>@config["AGENT NAME"]}).to_yaml)
         puts "FuzzClient: Starting up..."
-        begin
         send_client_ready
-        rescue
-            puts $!
-        end
     end
 
     def receive_data(data)
@@ -94,6 +90,7 @@ module FuzzClient
             case msg.verb
                 when "DELIVER"
                     # Deliver it here...
+                    # Send back a result, then...
                     send_client_ready
                 when "SERVER FINISHED"
                     puts "FuzzClient: Server is finished."
