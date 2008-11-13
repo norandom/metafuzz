@@ -3,7 +3,7 @@ require 'fileutils'
 require 'Win32API'
 require 'win32/process'
 require 'windows_manipulation'
-  include WindowOperations
+include WindowOperations
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
@@ -94,20 +94,20 @@ module CONN_OFFICE
         end		
     end
 
-def dialog_boxes
-  children=WindowOperations::do_enum_windows("parentwindow==#{@wid}")
-  children.length > 0
-end
+    def dialog_boxes
+        children=WindowOperations::do_enum_windows("parentwindow==#{@wid}")
+        children.length > 0
+    end
 
     #Cleanly destroy the app. 
     def destroy_connection
         begin
             @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
-           begin
+            begin
                 if is_connected?
                     sleep(1) while dialog_boxes
                     @app.Quit
-                  end
+                end
             rescue
                 puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
             end
