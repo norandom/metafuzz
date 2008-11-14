@@ -48,45 +48,73 @@ prod_thread=Thread.new do
     end
 end
 
+class ResultTracker
+    def initialize
+        @sent=0
+        @mutex=Mutex.new
+        @results={}
+    end
+
+    def increment_sent
+        Thread.critical
+        @sent+=1
+    ensure
+        Thread.critical=false
+    end
+
+    def add_result(id, status)
+        Thread.critical
+        unless @results[id]=="CHECKED OUT"
+            raise RuntimeError, "RT: The id not checked out yet?"
+        end
+        @results[id]=status
+    ensure
+        Thread.critical=false
+    end
+
+    def check_out
+        Thread.critical
+        increment_sent
+        @results[@sent]="CHECKED OUT"
+        @sent
+    ensure
+        Thread.critical=false
+    end
+
+    def spit_results
+        Thread.critical
+        succeeded=@results.select {|k,v| v=="SUCCESS"}.length
+        hangs=@results.select {|k,v| v=="HANG"}.length
+        fails=@results.select {|k,v| v=="FAIL"}.length
+        crashes=@results.select {|k,v| v=="CRASH"}.length
+        unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
+        puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
+        puts "(#{@sent} sent, #{@results.length} in result hash.)"
+    ensure
+        Thread.critical=false
+    end
+end
+
 module FuzzServer
 
     def post_init
         @handler=NetStringTokenizer.new
     end
 
-    def spit_results
-        @result_mutex.synchronize {
-            succeeded=@results.select {|k,v| v=="SUCCESS"}.length
-            hangs=@results.select {|k,v| v=="HANG"}.length
-            fails=@results.select {|k,v| v=="FAIL"}.length
-            crashes=@results.select {|k,v| v=="CRASH"}.length
-            unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
-            puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
-            @sent_mutex.synchronize {
-                puts "(#{@sent} sent, #{@results.length} in result hash.)"
-            }
-        }
-    end
-
-    def initialize(prod_queue)
+    def initialize(prod_queue, rt)
         @production_queue=prod_queue
-        @sent=0
-        @sent_mutex=Mutex.new
-        @results={}
-        @result_mutex=Mutex.new
-        EM.add_periodic_timer(30) {spit_results}
-        at_exit {spit_results}
+        @result_tracker=rt
+        EM.add_periodic_timer(30) {@result_tracker.spit_results}
+        at_exit {@result_tracker.spit_results}
     end
 
     def receive_data(data)
         @handler.parse(data).each do |m| 
             msg=FuzzMessage.new(m)
             if msg.verb=="CLIENT READY"
-                if msg.data
+                unless msg.data.empty?
                     result_id,result_status=msg.data.split(':')
-                    @result_mutex.synchronize {
-                        @results[result_id]=result_status
-                    }
+                    @result_tracker.add_result(Integer(result_id),result_status)
                 end
                 if @production_queue.empty? and @production_queue.finished?
                     send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
@@ -96,15 +124,9 @@ module FuzzServer
                         # This pop will block until data is available
                         # but since we are using EM.defer that's OK
                         my_data=@production_queue.pop
+                        id=@result_tracker.check_out
                         # This is what will be passed to the callback
-                        @sent_mutex.synchronize {
-                            msg_id=@sent
-                            @result_mutex.synchronize {
-                                @results[@sent]="CHECKED OUT"
-                            }
-                            @sent+=1
-                        }
-                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>@sent}).to_yaml)
+                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
                     end
                     # This callback will be invoked once the response is ready.
                     callback=proc do |data|
@@ -119,6 +141,7 @@ module FuzzServer
 
 end
 
+rt=ResultTracker.new
 EventMachine::run {
-    EventMachine::start_server("0.0.0.0", 10000, FuzzServer, prod_queue)
+    EventMachine::start_server("0.0.0.0", 10000, FuzzServer, prod_queue, rt)
 }
