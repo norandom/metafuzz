@@ -68,12 +68,12 @@ module FuzzServer
         }
     end
 
-    def initialize(prod_queue,result_hash,result_mutex)
+    def initialize(prod_queue)
         @production_queue=prod_queue
         @sent=0
         @sent_mutex=Mutex.new
         @results={}
-        @result_mutex=result_mutex
+        @result_mutex=Mutex.new
         EM.add_periodic_timer(30) {spit_results}
         at_exit {spit_results}
     end
@@ -81,9 +81,6 @@ module FuzzServer
     def receive_data(data)
         @handler.parse(data).each do |m| 
             msg=FuzzMessage.new(m)
-            puts msg.verb
-            puts msg.data.inspect
-            puts m.inspect
             if msg.verb=="CLIENT READY"
                 if msg.data
                     result_id,result_status=msg.data.split(':')
