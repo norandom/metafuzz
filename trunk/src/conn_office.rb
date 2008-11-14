@@ -65,6 +65,7 @@ module CONN_OFFICE
         raise RuntimeError, "CONN_OFFICE: blocking_write: Not connected!" unless is_connected?
         begin
             filename="temp" + Time.now.hash.to_s + self.object_id.to_s + ".doc"
+            filename=File.join(@path,filename)
             @files << filename
             fso=WIN32OLE.new("Scripting.FileSystemObject")
             path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
