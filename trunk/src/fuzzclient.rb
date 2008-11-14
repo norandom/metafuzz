@@ -85,15 +85,8 @@ module FuzzClient
         status=false
         begin
             begin
-                loop do
-                    begin
-                        @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
-                    rescue
-                        puts "Connector establishment failed #{$!}"
-                    end
-                    break if @word.connected?
-                    @word.close
-                end
+              @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+              @word.connected?
             rescue
                 raise RuntimeError, "Couldn't establish connection to app. #{$!}"
             end
@@ -135,7 +128,6 @@ module FuzzClient
             case msg.verb
             when "DELIVER"
                 begin
-                    puts msg.data.length
                     status=deliver msg.data
                 rescue
                     status="ERROR"
