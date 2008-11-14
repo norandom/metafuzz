@@ -25,7 +25,6 @@ else
     begin
         config_data=File.open(config_file, "r") {|io| io.read}
         config=YAML::load(config_data)
-        config=default_config.merge config
     rescue
         puts "Fuzzclient: Bad config file #{config_file}, using default config."
         config=default_config
@@ -119,6 +118,7 @@ module FuzzClient
             end
             @word.close
         end
+        puts status
         status
     end
 
