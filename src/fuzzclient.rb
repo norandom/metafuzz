@@ -119,7 +119,6 @@ module FuzzClient
             end
             @word.close
         end
-        puts status
         status
     end
 
