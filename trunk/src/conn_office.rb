@@ -21,7 +21,6 @@ module CONN_OFFICE
     #Errors should be handled at the Module level (ie here), since Connector
     #just assumes everything is going to plan.
 
-    #Open the application via OLE
     def pid_from_app(win32ole_app)
         # This approach is straight from MS docs, but it's a horrible hack. Set the window title
         # so we can tell it apart from any other Word instances, find the hWND, then use that
@@ -36,6 +35,7 @@ module CONN_OFFICE
         pid=pid.unpack('L')[0]
         [pid,wid]
     end
+
     private :pid_from_app
     attr_reader :pid,:wid
     #Open the application via OLE	
@@ -54,10 +54,9 @@ module CONN_OFFICE
         end
     end
 
-    # It would be lovely if this could check for dialogs or subwindows
-    # that need acknowledgement...
+    # Return true is there are alerts waiting for acknowledgement
     def blocking_read
-        ''
+        return dialog_boxes
     end
 
     #Write a string to a file and open it in the application
@@ -65,19 +64,19 @@ module CONN_OFFICE
         raise RuntimeError, "CONN_OFFICE: blocking_write: Not connected!" unless is_connected?
         begin
             filename="temp" + Time.now.hash.to_s + self.object_id.to_s + ".doc"
-            @files << filename
             fso=WIN32OLE.new("Scripting.FileSystemObject")
-            path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
+            path=fso.GetAbsolutePathName(File.join(@path,filename)) # Sometimes paths with backslashes break things, the FSO always does things right.
+            @files << path
             File.open(path, "wb+") {|io| io.write(data)}
             # this call blocks, so if it opens a dialog box immediately we lose control of the app. 
             # This is the biggest issue, and so far can only be solved with a separate monitor app
             # that kills word processes that are hanging here.
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
-            @app.visible
+            #@app.visible
         rescue
-            if $!.message =~ /OLE error code:0 .*Unknown/m # the OLE server threw an exception, might be a genuine crash.
+            if $!.message =~ /OLE error code:0 .*Unknown/m # Most likely the monitor app killed it, send back the pid
                 raise RuntimeError, "#{@pid}"
-            else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
+            else # Mostly it's an OLE "the doc was corrupt" error
                 destroy_connection
                 raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"
             end
@@ -105,11 +104,12 @@ module CONN_OFFICE
             @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
             begin
                 if is_connected?
-                    sleep(1) while dialog_boxes
-                    @app.Quit
+                    loop do
+                        @app.Quit unless dialog_boxes
+                    end
                 end
             rescue
-                puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
+                retry if is_connected? # the monitor app will kill it eventually
             end
         ensure
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough

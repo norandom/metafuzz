@@ -7,7 +7,7 @@ class FuzzMessage
     # below will also be added as getters and setters, making the protocol
     # self extending if both parties agree.
     def initialize(data)
-        @msghash={:verb=>'',:station_id=>'',:message=>'',:checksum=>''}
+        @msghash={:verb=>'',:station_id=>'',:data=>'',:checksum=>''}
         if data.class==String
             load_yaml(data)
         else

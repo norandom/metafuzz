@@ -25,17 +25,26 @@ end
 
 prod_thread=Thread.new do
     begin
-        gen=Generators::RollingCorrupt.new("XXXX",8,8)
-        while gen.next?
-            # This << will block until the queue has < 20 items
-            prod_queue << gen.next
+        puts "Production thread starting..."
+        unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
+        header,raw_fib,rest=""
+        File.open( 'c:\share\boof.doc',"rb") {|io| 
+            header=io.read(512)
+            raw_fib=io.read(1472)
+            rest=io.read
+        }
+        raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
+        g=Generators::RollingCorrupt.new(raw_fib,8,3)
+        while g.next?
+            fuzzed=g.next
+            raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
+            prod_queue << (header+fuzzed+rest)
         end
-        puts "Production Thread Finished."
         prod_queue.finish
-        Thread.stop
+        Thread.current.exit	
     rescue
-        puts "Error: Production Thread Exiting: #{$!}"
-        Thread.current.exit
+        puts "Production failed: #{$!}";$stdout.flush
+        exit
     end
 end
 
@@ -45,14 +54,43 @@ module FuzzServer
         @handler=NetStringTokenizer.new
     end
 
-    def initialize(prod_queue)
+    def spit_results
+        @result_mutex.synchronize {
+            succeeded=@results.select {|k,v| v=="SUCCESS"}.length
+            hangs=@results.select {|k,v| v=="HANG"}.length
+            fails=@results.select {|k,v| v=="FAIL"}.length
+            crashes=@results.select {|k,v| v=="CRASH"}.length
+            unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
+            puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
+            @sent_mutex.synchronize {
+                puts "(#{@sent} sent, #{@results.length} in result hash.)"
+            }
+        }
+    end
+
+    def initialize(prod_queue,result_hash,result_mutex)
         @production_queue=prod_queue
+        @sent=0
+        @sent_mutex=Mutex.new
+        @results={}
+        @result_mutex=result_mutex
+        EM.add_periodic_timer(30) {spit_results}
+        at_exit {spit_results}
     end
 
     def receive_data(data)
         @handler.parse(data).each do |m| 
             msg=FuzzMessage.new(m)
+            puts msg.verb
+            puts msg.data.inspect
+            puts m.inspect
             if msg.verb=="CLIENT READY"
+                if msg.data
+                    result_id,result_status=msg.data.split(':')
+                    @result_mutex.synchronize {
+                        @results[result_id]=result_status
+                    }
+                end
                 if @production_queue.empty? and @production_queue.finished?
                     send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
                 else
@@ -62,7 +100,14 @@ module FuzzServer
                         # but since we are using EM.defer that's OK
                         my_data=@production_queue.pop
                         # This is what will be passed to the callback
-                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data}).to_yaml)
+                        @sent_mutex.synchronize {
+                            msg_id=@sent
+                            @result_mutex.synchronize {
+                                @results[@sent]="CHECKED OUT"
+                            }
+                            @sent+=1
+                        }
+                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>@sent}).to_yaml)
                     end
                     # This callback will be invoked once the response is ready.
                     callback=proc do |data|

@@ -2,14 +2,16 @@ require 'rubygems'
 require 'eventmachine'
 require 'em_netstring'
 require 'fuzzprotocol'
+require 'connector'
+require 'conn_office'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
-        "SERVER IP"=>"127.0.0.1",
-        "SERVER PORT"=>10000,
-        "WORK DIR"=>'C:\fuzzclient',
-        "CONFIG DIR"=>'C:\fuzzclient',
-        "POLL INTERVAL"=>5
+    "SERVER IP"=>"127.0.0.1",
+    "SERVER PORT"=>10000,
+    "WORK DIR"=>'C:\fuzzclient',
+    "CONFIG DIR"=>'C:\fuzzclient',
+    "POLL INTERVAL"=>5
 }
 
 config_file=ARGV[0]
@@ -65,22 +67,67 @@ module FuzzClient
         @config=config
     end
 
-    def send_client_ready
+    def send_client_ready(data='')
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        send_data @ready_msg
-        @connect=EventMachine::DefaultDeferrable.new
-        @connect.timeout(@config["POLL INTERVAL"])
-        @connect.errback do
-           puts "Fuzzclient: Connection timed out. Retrying."
-           send_client_ready
+        ready_msg=@handler.pack(FuzzMessage.new({
+            :verb=>"CLIENT READY",
+            :station_id=>@config["AGENT NAME"],
+            :data=>data}).to_yaml)
+            send_data ready_msg
+            @connect=EventMachine::DefaultDeferrable.new
+            @connect.timeout(@config["POLL INTERVAL"])
+            @connect.errback do
+                puts "Fuzzclient: Connection timed out. Retrying."
+                send_client_ready
+            end
+    end
+
+    def deliver(data)
+        status=false
+        begin
+            begin
+                loop do
+                    begin
+                        @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+                    rescue
+                        puts "Connector establishment failed #{$!}"
+                    end
+                    break if @word.connected?
+                    @word.close
+                end
+            rescue
+                raise RuntimeError, "Couldn't establish connection to app. #{$!}"
+            end
+            @word.deliver data
+            unless @word.connected?
+                print "!#{@word.pid}!";$stdout.flush
+                File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
+                status="CRASH"
+            else
+                print(".");$stdout.flush
+                status="SUCCESS"
+            end
+            @word.close
+        rescue 
+            unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+                print "<#{$!.message}>";$stdout.flush
+                #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+                status="HANG"
+            else
+                print "#";$stdout.flush
+                status="FAIL"
+            end
+            @word.close
         end
+        puts status
+        status
     end
 
     def post_init
         @handler=NetStringTokenizer.new
-        @ready_msg=@handler.pack(FuzzMessage.new({:verb=>"CLIENT READY",:station_id=>@config["AGENT NAME"]}).to_yaml)
+        @sent=0
         puts "FuzzClient: Starting up..."
-        send_client_ready
+        send_client_ready ""
     end
 
     def receive_data(data)
@@ -88,15 +135,20 @@ module FuzzClient
             @connect.succeed
             msg=FuzzMessage.new(m)
             case msg.verb
-                when "DELIVER"
-                    # Deliver it here...
-                    # Send back a result, then...
-                    send_client_ready
-                when "SERVER FINISHED"
-                    puts "FuzzClient: Server is finished."
-                    EventMachine::stop_event_loop
-                else
-                    raise RuntimeError, "Unknown Command!"
+            when "DELIVER"
+                begin
+                    puts msg.data.length
+                    status=deliver msg.data
+                rescue
+                    status="ERROR"
+                    raise RuntimeError, "Something is fucked. Dying"
+                end
+                send_client_ready "#{msg.id}:#{status}"
+            when "SERVER FINISHED"
+                puts "FuzzClient: Server is finished."
+                EventMachine::stop_event_loop
+            else
+                raise RuntimeError, "Unknown Command!"
             end
         }
     end
