@@ -38,7 +38,8 @@ class Connector
     establish_connection
     # Start the receive thread
     #Thread.abort_on_exception=true
-    Thread.new do
+
+    @recv_thread=Thread.new do
       loop do
         begin
           item = blocking_read 
@@ -56,6 +57,7 @@ class Connector
         } unless item.nil?
       end
     end
+
   end
 
   #Deliver a string to the peer using a blocking write.
@@ -129,6 +131,7 @@ class Connector
   #local socket, for connection-oriented protocols like TCP it will reset the connection
   #with the peer.
   def close
+    @recv_thread.kill
     destroy_connection if connected?
   end
 
