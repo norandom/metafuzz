@@ -111,6 +111,7 @@ module FuzzClient
             end
             @word.close
         end
+        @word=nil
         status
     end
 
