@@ -7,7 +7,7 @@ require 'conn_office'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
-    "SERVER IP"=>"127.0.0.1",
+    "SERVER IP"=>"192.168.241.2",
     "SERVER PORT"=>10000,
     "WORK DIR"=>'C:\fuzzclient',
     "CONFIG DIR"=>'C:\fuzzclient',

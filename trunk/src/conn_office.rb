@@ -113,10 +113,8 @@ end
                 puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
             end
         ensure
-            WIN32OLE.ole_free(@app)
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
             @files.each {|fn| FileUtils.rm_f(fn)}
-            GC.start
         end
     end
 
