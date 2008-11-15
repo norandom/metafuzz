@@ -85,31 +85,37 @@ module FuzzClient
         status=false
         begin
             begin
-              @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
-              @word.connected?
-            rescue
-                raise RuntimeError, "Couldn't establish connection to app. #{$!}"
+                begin
+                    @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+                    @word.connected?
+                rescue
+                    raise RuntimeError, "Couldn't establish connection to app. #{$!}"
+                end
+                @word.deliver data
+                unless @word.connected?
+                    print "!#{@word.pid}!";$stdout.flush
+                    File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
+                    status="CRASH"
+                else
+                    print(".");$stdout.flush
+                    status="SUCCESS"
+                end
+                @word.close
+            rescue 
+                unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+                    print "<#{$!.message}>";$stdout.flush
+                    #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+                    status="HANG"
+                else
+                    print "#";$stdout.flush
+                    status="FAIL"
+                end
+                @word.close
             end
-            @word.deliver data
-            unless @word.connected?
-                print "!#{@word.pid}!";$stdout.flush
-                File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
-                status="CRASH"
-            else
-                print(".");$stdout.flush
-                status="SUCCESS"
-            end
-            @word.close
-        rescue 
-            unless $!.message =~ /CONN_OFFICE/m # a process id that went away
-                print "<#{$!.message}>";$stdout.flush
-                #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-                status="HANG"
-            else
-                print "#";$stdout.flush
-                status="FAIL"
-            end
-            @word.close
+        rescue
+            print "!#{@word.pid}!";$stdout.flush
+            File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
+            status="CRASH"
         end
         @word=nil
         status
@@ -132,7 +138,7 @@ module FuzzClient
                     status=deliver msg.data
                 rescue
                     status="ERROR"
-                    raise RuntimeError, "Something is fucked. Dying"
+                    raise RuntimeError, "Something is fucked. Dying #{$!}"
                 end
                 send_client_ready "#{msg.id}:#{status}"
             when "SERVER FINISHED"

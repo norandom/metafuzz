@@ -53,6 +53,7 @@ class ResultTracker
         @sent=0
         @mutex=Mutex.new
         @results={}
+        @start=Time.now
     end
 
     def increment_sent
@@ -89,7 +90,7 @@ class ResultTracker
         crashes=@results.select {|k,v| v=="CRASH"}.length
         unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
         puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
-        puts "(#{@sent} sent, #{@results.length} in result hash.)"
+        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%(@sent/(Time.now-@start).to_f)}/s)"
     ensure
         Thread.critical=false
     end

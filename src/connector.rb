@@ -131,6 +131,8 @@ class Connector
   #local socket, for connection-oriented protocols like TCP it will reset the connection
   #with the peer.
   def close
+    # If the user doesn't call this they will leak memory, because the receive
+    # thread will hang around... so yeah, call close. :)
     @recv_thread.kill
     destroy_connection if connected?
   end
