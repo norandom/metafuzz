@@ -16,16 +16,16 @@ end
 def delete_temp_files
     tempfiles='C:/Documents and Settings/Administrator/Local Settings/Temporary Internet Files/Content.Word/*WR*.tmp'
     fuzzfiles='C:/fuzzclient/*mp*.doc'
-    
+
     [tempfiles,fuzzfiles].each {|pattern|
-    Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
-        begin
-            FileUtils.rm_f(fn)
-        rescue
-            next # probably still open
-        end
-        print "@";$stdout.flush
-    }
+        Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
+            begin
+                FileUtils.rm_f(fn)
+            rescue
+                next # probably still open
+            end
+            print "@";$stdout.flush
+        }
     }
 end
 
@@ -36,24 +36,24 @@ def kill_dialog_boxes
         v << children
     }
 
-my_result.each {|k,v|
-    v[3].each {|k,v|
-      if v[1]=~/bosa_sdm/ # dialog box, like Show Repairs or password prompt for encrypted file
-        # These guys don't expose their buttons as children, you just have to tell them to die.
-        WindowOperations::send_window_message(k,WM_DESTROY)
-      end
-      if v[1]=~/32770/ # alert, like 'too big to save' or 'do you want to download a converter'
-        alert_stuff=do_child_windows(k)
-            switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-            switch_to_window.call(k,1)
-        alert_stuff.each {|k,v|
-          if v[0]=="Button" and (v[1]=="OK" or v[1]=="&No")
-            WindowOperations::send_window_message(k,BMCLICK)
-          end
-          }
-      end
-      }
-  }
+    my_result.each {|k,v|
+        v[3].each {|k,v|
+            if v[1]=~/bosa_sdm/ # dialog box, like Show Repairs or password prompt for encrypted file
+                # These guys don't expose their buttons as children, you just have to tell them to die.
+                WindowOperations::send_window_message(k,WM_DESTROY)
+            end
+            if v[1]=~/32770/ # alert, like 'too big to save' or 'do you want to download a converter'
+                alert_stuff=do_child_windows(k)
+                switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+                switch_to_window.call(k,1)
+                alert_stuff.each {|k,v|
+                    if v[0]=="Button" and (v[1]=="OK" or v[1]=="&No")
+                        WindowOperations::send_window_message(k,BMCLICK)
+                    end
+                }
+            end
+        }
+    }
 end
 
 dialog_killer=Thread.new do
