@@ -34,7 +34,7 @@ prod_thread=Thread.new do
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,8,3)
+        g=Generators::RollingCorrupt.new(raw_fib,13,7)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -53,7 +53,8 @@ class ResultTracker
         @sent=0
         @mutex=Mutex.new
         @results={}
-        @start=Time.now
+        @time_mark=Time.now
+        @sent_mark=0
     end
 
     def increment_sent
@@ -89,8 +90,12 @@ class ResultTracker
         fails=@results.select {|k,v| v=="FAIL"}.length
         crashes=@results.select {|k,v| v=="CRASH"}.length
         unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
+        if @sent%100==0
+            @sent_mark=@sent
+            @time_mark=Time.now
+        end
         puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
-        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%(@sent/(Time.now-@start).to_f)}/s)"
+        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%((@sent-@sent_mark)/(Time.now-@time_mark).to_f)}/s)"
     ensure
         Thread.critical=false
     end
