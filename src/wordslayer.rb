@@ -87,7 +87,6 @@ begin
         }
         delete_temp_files
         print '*';$stdout.flush
-        puts word_instances.length
         sleep(5)
     end
 rescue
