@@ -81,7 +81,7 @@ module FuzzClient
             end
     end
 
-    def deliver(data)
+    def deliver(data,msg_id)
         status=false
         begin
             begin
@@ -94,7 +94,7 @@ module FuzzClient
                 @word.deliver data
                 unless @word.connected?
                     print "!#{@word.pid}!";$stdout.flush
-                    File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
+                    File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
                     status="CRASH"
                 else
                     print(".");$stdout.flush
@@ -114,7 +114,7 @@ module FuzzClient
             end
         rescue
             print "!#{@word.pid}!";$stdout.flush
-            File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(data)}
+            File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
             status="CRASH"
         end
         @word=nil
@@ -135,7 +135,7 @@ module FuzzClient
             case msg.verb
             when "DELIVER"
                 begin
-                    status=deliver msg.data
+                    status=deliver(msg.data,msg.id)
                 rescue
                     status="ERROR"
                     raise RuntimeError, "Something is fucked. Dying #{$!}"
