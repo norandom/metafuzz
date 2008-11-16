@@ -91,9 +91,10 @@ module FuzzClient
                 rescue
                     raise RuntimeError, "Couldn't establish connection to app. #{$!}"
                 end
+                current_pid=@word.pid
                 @word.deliver data
                 unless @word.connected?
-                    print "!#{@word.pid}!";$stdout.flush
+                    print "!#{current_pid}!";$stdout.flush
                     File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
                     status="CRASH"
                 else
@@ -113,7 +114,7 @@ module FuzzClient
                 @word.close
             end
         rescue
-            print "!#{@word.pid}!";$stdout.flush
+            print "!#{current_pid}!";$stdout.flush
             File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
             status="CRASH"
         end
