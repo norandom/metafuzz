@@ -5,7 +5,7 @@ require 'windows_manipulation'
 require 'pp'
 
 def get_process_array(wmi)
-    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE'")
+    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
     ary=[]
     processes.each {|p|
         ary << p.ProcessId
@@ -14,13 +14,18 @@ def get_process_array(wmi)
 end
 
 def delete_temp_files
-    Dir.glob("*mp*.doc", File::FNM_DOTMATCH).each {|fn| 
+    tempfiles='C:/Documents and Settings/Administrator/Local Settings/Temporary Internet Files/Content.Word/*WR*.tmp'
+    fuzzfiles='C:/fuzzclient/*mp*.doc'
+    
+    [tempfiles,fuzzfiles].each {|pattern|
+    Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
         begin
             FileUtils.rm_f(fn)
         rescue
             next # probably still open
         end
         print "@";$stdout.flush
+    }
     }
 end
 
@@ -33,12 +38,12 @@ def kill_dialog_boxes
 
 my_result.each {|k,v|
     v[3].each {|k,v|
-      if v[1]=~/bosa_sdm/
+      if v[1]=~/bosa_sdm/ # dialog box, like Show Repairs or password prompt for encrypted file
+        # These guys don't expose their buttons as children, you just have to tell them to die.
         WindowOperations::send_window_message(k,WM_DESTROY)
       end
-      if v[1]=~/32770/
+      if v[1]=~/32770/ # alert, like 'too big to save' or 'do you want to download a converter'
         alert_stuff=do_child_windows(k)
-
             switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
             switch_to_window.call(k,1)
         alert_stuff.each {|k,v|
@@ -82,6 +87,7 @@ begin
         }
         delete_temp_files
         print '*';$stdout.flush
+        puts word_instances.length
         sleep(5)
     end
 rescue
