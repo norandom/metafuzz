@@ -11,19 +11,21 @@ production_finished=false
 sent=0
 start=Time.now
 unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
+work_dir='c:/fuzzclient'
 
 production=Thread.new do
     begin
         header,raw_fib,rest=""
-        File.open( 'c:\bunk\boof.doc',"rb") {|io| 
+        File.open( 'c:\share\boof.doc',"rb") {|io| 
             header=io.read(512)
             raw_fib=io.read(1472)
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         fib=WordFIB.new(raw_fib)
-        200.times do
-            fib.fcSttbfffn+=1
+        fib.fcSttbfffn=0
+        1024.times do
+            fib.fcSttbfffn+=2048
             fuzzed=fib.to_s
             queue_mutex.synchronize{
                 send_queue << (header+fuzzed.to_s+rest)
@@ -108,7 +110,7 @@ begin
             end
             @data=data
             loop do
-                @conn=Connector.new(CONN_OFFICE, 'word')
+                @conn=Connector.new(CONN_OFFICE, 'word', work_dir)
                 break if @conn.connected?
                 @conn=nil
                 sleep(rand(5))
@@ -128,9 +130,9 @@ begin
             @conn.close if @conn
             @conn=nil
         rescue 
-            unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+            if $!.message =~ /CRASH/m # a process id that went away
                 print "<#{$!.message}>";$stdout.flush
-                #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+                File.open(File.join(work_dir,"2crash"+self.object_id.to_s+'-'+sent.to_s+".doc"), "wb+") {|io| io.write(@data)}
             else
                 print "#";$stdout.flush
             end
