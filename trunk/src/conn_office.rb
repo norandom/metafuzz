@@ -76,8 +76,13 @@ module CONN_OFFICE
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
             @app.visible
         rescue
-            if $!.message =~ /OLE error code:0 .*Unknown/m # the OLE server threw an exception, might be a genuine crash.
-                raise RuntimeError, "#{@pid}"
+            if $!.message =~ /OLE error code:0 .*The server threw an exception/m # the OLE server threw an exception, might be a genuine crash.
+                begin
+                  Process.kill(9,@pid) # So we don't have to wait for wordslayer to step in...
+                rescue
+                  nil
+                end
+                raise RuntimeError, "CRASH:#{@pid}"
             else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
                 destroy_connection
                 raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"

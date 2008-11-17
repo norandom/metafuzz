@@ -95,7 +95,7 @@ module FuzzClient
                 @word.deliver data
                 unless @word.connected?
                     print "!#{current_pid}!";$stdout.flush
-                    File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
+                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+")) {|io| io.write(data)}
                     status="CRASH"
                 else
                     print(".");$stdout.flush
@@ -103,10 +103,10 @@ module FuzzClient
                 end
                 @word.close
             rescue 
-                unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+                if $!.message =~ /CRASH/m # a process id that went away
                     print "<#{$!.message}>";$stdout.flush
-                    #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-                    status="HANG"
+                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+")) {|io| io.write(data)}
+                    status="CRASH"
                 else
                     print "#";$stdout.flush
                     status="FAIL"
@@ -115,7 +115,7 @@ module FuzzClient
             end
         rescue
             print "!#{current_pid}!";$stdout.flush
-            File.open("1crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc", "wb+") {|io| io.write(data)}
+            File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+")) {|io| io.write(data)}
             status="CRASH"
         end
         @word=nil
