@@ -12,33 +12,32 @@ sent=0
 start=Time.now
 unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
 
-=begin
 production=Thread.new do
-  begin
+    begin
         header,raw_fib,rest=""
         File.open( 'c:\bunk\boof.doc',"rb") {|io| 
-          header=io.read(512)
-          raw_fib=io.read(1472)
-          rest=io.read
+            header=io.read(512)
+            raw_fib=io.read(1472)
+            rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         fib=WordFIB.new(raw_fib)
-        fuzzer=Fuzzer.new(fib)
-        fuzzer.preserve_length=true
-        fuzzer.basic_tests("corner",0,false) {|fuzzed|
-          queue_mutex.synchronize{
+        200.times do
+            fib.fcSttbfffn+=1
+            fuzzed=fib.to_s
+            queue_mutex.synchronize{
                 send_queue << (header+fuzzed.to_s+rest)
-          }
-        }
+            }
+            fuzzed=nil
+        end
         production_finished=true
         Thread.current.exit
-  rescue
+    rescue
         puts "Production failed: #{$!}";$stdout.flush
         exit
-  end
+    end
 end
-=end
-
+=begin
 production=Thread.new do
     begin
         header,raw_fib,rest=""
@@ -69,6 +68,7 @@ production=Thread.new do
         exit
     end
 end
+=end
 =begin
 idle_word_pruner=Thread.new do
   word_instances=Hash.new(0)
@@ -95,64 +95,60 @@ idle_word_pruner=Thread.new do
   end
 end
 =end
-1.times do
-    Thread.new do
+begin
+    loop do
         begin
+            data=nil
             loop do
-                begin
-                    data=nil
-                    loop do
-                        queue_mutex.synchronize {
-                            data=send_queue.pop unless send_queue.empty?
-                        }
-                        break if data
-                        sleep(rand(5))
-                    end
-                    Thread.current[:data]=data
-                    loop do
-                        Thread.current[:conn]=Connector.new(CONN_OFFICE, 'word')
-                        break if Thread.current[:conn].connected?
-                        Thread.current[:conn]=nil
-                        sleep(rand(5))
-                    end
-                    sent+=1
-                    Thread.current[:conn].deliver data
-                    unless Thread.current[:conn].connected?
-                        print "[1-#{sent}-1]";$stdout.flush
-                        File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-                        Thread.current[:conn]=nil
-                    end
-                    print(".");$stdout.flush
-                    if sent%100==0
-                        GC.start
-                        print "<#{sent}>";$stdout.flush
-                    end
-                    Thread.current[:conn].close if Thread.current[:conn]
-                    Thread.current[:conn]=nil
-                rescue 
-                    unless $!.message =~ /CONN_OFFICE/m # a process id that went away
-                        print "<#{$!.message}>";$stdout.flush
-                        #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-                    else
-                        print "#";$stdout.flush
-                    end
-                    if sent%100==0
-                        GC.start
-                        print "<#{sent}>";$stdout.flush
-                    end
-                    Thread.current[:conn].close if Thread.current[:conn]
-                    Thread.current[:conn]=nil
-                    retry
-                end
+                queue_mutex.synchronize {
+                    data=send_queue.pop unless send_queue.empty?
+                }
+                break if data
+                sleep(rand(5))
             end
-        rescue
-            print "[3-#{sent}-3]";$stdout.flush
-            #File.open("3crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
-            Thread.current[:conn].close if Thread.current[:conn]
-            Thread.current[:conn]=nil
+            @data=data
+            loop do
+                @conn=Connector.new(CONN_OFFICE, 'word')
+                break if @conn.connected?
+                @conn=nil
+                sleep(rand(5))
+            end
+            sent+=1
+            @conn.deliver data
+            unless @conn.connected?
+                print "[1-#{sent}-1]";$stdout.flush
+                File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(@data)}
+                @conn=nil
+            end
+            print(".");$stdout.flush
+            if sent%100==0
+                GC.start
+                print "<#{sent}>";$stdout.flush
+            end
+            @conn.close if @conn
+            @conn=nil
+        rescue 
+            unless $!.message =~ /CONN_OFFICE/m # a process id that went away
+                print "<#{$!.message}>";$stdout.flush
+                #File.open("2crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(Thread.current[:data])}
+            else
+                print "#";$stdout.flush
+            end
+            if sent%100==0
+                GC.start
+                print "<#{sent}>";$stdout.flush
+            end
+            @conn.close if @conn
+            @conn=nil
             retry
         end
     end
+rescue
+    print "[3-#{sent}-3]";$stdout.flush
+    File.open("1crash"+self.object_id.to_s+'-'+sent.to_s+".doc", "wb+") {|io| io.write(@data)}
+    @conn.close if @conn
+    @conn=nil
+    retry
 end
 at_exit {puts "Exiting... #{sent}";puts $!}
 sleep(1) until production_finished and send_queue.empty?
