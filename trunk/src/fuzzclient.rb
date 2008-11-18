@@ -92,10 +92,11 @@ module FuzzClient
                     raise RuntimeError, "Couldn't establish connection to app. #{$!}"
                 end
                 current_pid=@word.pid
+                @data=data
                 @word.deliver data
                 unless @word.connected?
                     print "!#{current_pid}!";$stdout.flush
-                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
+                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
                     status="CRASH"
                 else
                     print(".");$stdout.flush
@@ -105,7 +106,7 @@ module FuzzClient
             rescue 
                 if $!.message =~ /CRASH/m # a process id that went away
                     print "<#{$!.message}>";$stdout.flush
-                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
+                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
                     status="CRASH"
                 else
                     print "#";$stdout.flush
@@ -115,7 +116,7 @@ module FuzzClient
             end
         rescue
             print "!#{current_pid}!";$stdout.flush
-            File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
+            File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
             status="CRASH"
         end
         @word=nil
