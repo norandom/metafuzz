@@ -34,7 +34,8 @@ prod_thread=Thread.new do
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,8,5)
+        rfcopy=raw_fib.deep_copy
+        g=Generators::RollingCorrupt.new(rfcopy,8,8)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
