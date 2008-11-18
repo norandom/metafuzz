@@ -1,4 +1,5 @@
 require 'generator'
+require 'objhax'
 
 #Generators that can be used to create output for various purposes.
 #The Fuzzer object already contains tweakable constants that will create simple generators for basic elements like
@@ -346,6 +347,7 @@ module Generators
     def initialize(str, bitlength, stepsize)
       @str,@bitlength,@stepsize=str,bitlength,stepsize
       @binstr=str.unpack('B*').first
+      raise RuntimeError, "Generators::RollingCorrupt: internal bitstring conversion broken?" unless @binstr.length==(@str.length*8)
       @block=proc {|g|
         gBin=Generators::BinaryCornerCases.new(bitlength)
         rng=Range.new(0, @binstr.length-1)
