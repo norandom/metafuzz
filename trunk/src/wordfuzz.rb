@@ -12,7 +12,7 @@ sent=0
 start=Time.now
 unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
 work_dir='c:/fuzzclient'
-
+=begin
 production=Thread.new do
     begin
         header,raw_fib,rest=""
@@ -39,6 +39,7 @@ production=Thread.new do
         exit
     end
 end
+=end
 =begin
 production=Thread.new do
     begin
@@ -71,32 +72,35 @@ production=Thread.new do
     end
 end
 =end
-=begin
-idle_word_pruner=Thread.new do
-  word_instances=Hash.new(0)
-  begin
-        wmi = WIN32OLE.connect("winmgmts://")
-        loop do
-          processes = wmi.ExecQuery("select * from win32_process")
-          processes.each {|p|
-                if p.Name=="WINWORD.EXE"
-                  if word_instances[p.ProcessId] > 1
-                        print "[!#{p.ProcessId}!]";$stdout.flush
-                        Process.kill(1, p.ProcessId)
-                        word_instances.delete(p.ProcessId)
-                  else
-                        word_instances[p.ProcessId]+=1
-                  end
-                end
-          }
-          print '*';$stdout.flush
-          sleep(30)
+
+production=Thread.new do
+    begin
+        header,target,rest=""
+        File.open( 'c:\share\boof.doc',"rb") {|io| 
+            header=io.read(40224)
+            target=io.read(160)
+            rest=io.read
+        }
+        raise RuntimeError, "Data Corruption" unless header+target+rest == unmodified_file
+        g=Generators::RollingCorrupt.new(target,32,8)
+        while g.next?
+            toobig=false
+            fuzzed=g.next
+            raise RuntimeError, "Data Corruption" unless fuzzed.length==target.length
+            queue_mutex.synchronize{
+                send_queue << (header+fuzzed+rest)
+                toobig=true if send_queue.length > 50
+            }
+            sleep(5) if toobig
         end
-  rescue
-        raise RuntimeError, "Monitor Thread died: #{$!}"
-  end
+        production_finished=true
+        Thread.current.exit	
+    rescue
+        puts "Production failed: #{$!}";$stdout.flush
+        exit
+    end
 end
-=end
+
 begin
     loop do
         begin
