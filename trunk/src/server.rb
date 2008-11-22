@@ -4,6 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'thread'
 require 'fuzzer'
+require 'fib'
 
 prod_queue=SizedQueue.new(20)
 # Quickly patch the queue object to add a finished? method
@@ -34,11 +35,11 @@ prod_thread=Thread.new do
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
-        rfcopy=raw_fib.deep_copy
-        g=Generators::RollingCorrupt.new(rfcopy,8,8)
-        while g.next?
-            fuzzed=g.next
-            raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
+        fib=WordFIB.new(raw_fib)
+        fib.fcSttbfffn=0
+        32768.times do
+            fib.fcSttbfffn+=1
+            fuzzed=fib.to_s
             prod_queue << (header+fuzzed+rest)
         end
         prod_queue.finish
