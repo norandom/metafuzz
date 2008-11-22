@@ -5,7 +5,7 @@ require 'digest/md5'
 
 WORD_PATH='c:/program files/microsoft office/office12'
 CDB_PATH='C:/Program Files/Debugging Tools for Windows (x86)'
-CRASHFILE_PATH='C:/share/wordcrashes'
+CRASHFILE_PATH='C:/fuzzclient'
 
 # each file to analyze
 Dir.glob("#{CRASHFILE_PATH}/crash*.doc").each {|currentfile|
