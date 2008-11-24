@@ -36,9 +36,9 @@ prod_thread=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         fib=WordFIB.new(raw_fib)
-        fib.fcSttbfffn=0
+        fib.fcSttbfffn=0xffffffff
         32768.times do
-            fib.fcSttbfffn+=1
+            fib.fcSttbfffn-=1
             fuzzed=fib.to_s
             prod_queue << (header+fuzzed+rest)
         end
@@ -126,6 +126,8 @@ module FuzzServer
                 end
                 if @production_queue.empty? and @production_queue.finished?
                     send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
+                    sleep(10)
+                    EventMachine::stop_event_loop
                 else
                     # define a block to prepare the response
                     get_data=proc do
@@ -153,3 +155,4 @@ rt=ResultTracker.new
 EventMachine::run {
     EventMachine::start_server("0.0.0.0", 10000, FuzzServer, prod_queue, rt)
 }
+rt.spit_results
