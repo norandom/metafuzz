@@ -23,9 +23,14 @@ Dir.glob("#{CRASHFILE_PATH}/crash*.doc").each {|currentfile|
     out.each_line {|l| res << l.chomp if l=~/^eax/ or l=~/^eip/ or l=~/^cs/}
     register_string=res.join(' ').squeeze(' ')
     hsh=Digest::MD5.hexdigest(register_string)
-    unless File.directory? CRASHFILE_PATH+"/#{hsh}"
-       Dir.mkdir(CRASHFILE_PATH+"/#{hsh}")
+    begin
+        unless File.directory? CRASHFILE_PATH+"/#{hsh}"
+            Dir.mkdir(CRASHFILE_PATH+"/#{hsh}")
+        end
+        FileUtils.mv(currentfile,CRASHFILE_PATH+"/#{hsh}")
+    rescue
+        sleep(5)
+        retry
     end
-    FileUtils.mv(currentfile,CRASHFILE_PATH+"/#{hsh}")
 }
 
