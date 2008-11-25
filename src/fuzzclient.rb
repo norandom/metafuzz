@@ -165,14 +165,24 @@ module FuzzClient
             msg=FuzzMessage.new(m)
             case msg.verb
             when "DELIVER"
-                begin
-                    fuzzfile=Diff::LCS.patch(@template,msg.data)
-                    status=deliver(fuzzfile,msg.id)
-                rescue
-                    status="ERROR"
-                    raise RuntimeError, "Something is fucked. Dying #{$!}"
-                end
-                send_client_ready "#{msg.id}:#{status}"
+
+                    #fuzzfile=Diff::LCS.patch(@template,msg.data)
+                    fuzzfile=msg.data
+                    send_to_word=proc do
+                      begin
+                        status=deliver(fuzzfile,msg.id)
+                      rescue
+                        status="ERROR"
+                        raise RuntimeError, "Something is fucked. Dying #{$!}"
+                      end
+                      "#{msg.id}:#{status}"
+                    end
+                    callback=proc do |result|
+                      send_client_ready result
+                      end
+                EM.defer(send_to_word,callback)
+                #send_client_ready "#{msg.id}:#{status}"
+                #send_client_ready ""
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
                 EventMachine::stop_event_loop
