@@ -159,7 +159,7 @@ module FuzzServer
             @result_tracker.add_result(Integer(result_id),result_status)
     end
 
-    def handle_client_ready(msg)
+    def handle_client_ready
         if @production_queue.empty? and @production_queue.finished?
             puts "All done, waiting to shut down..."
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))

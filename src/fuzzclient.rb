@@ -84,9 +84,9 @@ module FuzzClient
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
             send_data ready_msg
-            @connect=EventMachine::DefaultDeferrable.new
-            @connect.timeout(@config["POLL INTERVAL"])
-            @connect.errback do
+            @initial_connect=EventMachine::DefaultDeferrable.new
+            @initial_connect.timeout(@config["POLL INTERVAL"])
+            @initial_connect.errback do
                 puts "Fuzzclient: Connection timed out. Retrying."
                 send_client_startup
             end
@@ -99,12 +99,15 @@ module FuzzClient
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
             send_data ready_msg
+<<<<<<< .mine
+=======
             @connect=EventMachine::DefaultDeferrable.new
             @connect.timeout(@config["POLL INTERVAL"])
             @connect.errback do
                 puts "Fuzzclient: Connection timed out. Retrying."
                 send_client_ready
             end
+>>>>>>> .r57
     end
 
     def send_result(data='')
@@ -114,12 +117,6 @@ module FuzzClient
             :station_id=>@config["AGENT NAME"],
             :data=>data}).to_yaml)
             send_data ready_msg
-            @connect=EventMachine::DefaultDeferrable.new
-            @connect.timeout(@config["POLL INTERVAL"])
-            @connect.errback do
-                puts "Fuzzclient: Connection timed out. Retrying."
-                send_result data
-            end
     end
 
     def deliver(data,msg_id)
@@ -176,7 +173,6 @@ module FuzzClient
 
     def receive_data(data)
         @handler.parse(data).each {|m| 
-            @connect.succeed
             msg=FuzzMessage.new(m)
             case msg.verb
             when "DELIVER"
@@ -200,6 +196,7 @@ module FuzzClient
                 puts "FuzzClient: Server is finished."
                 EventMachine::stop_event_loop
             when "TEMPLATE"
+                @initial_connect.succeed
                 @template=msg.data
                 send_client_ready
             else
