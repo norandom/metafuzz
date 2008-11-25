@@ -4,6 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'connector'
 require 'conn_office'
+require 'diff/lcs'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
@@ -66,19 +67,44 @@ module FuzzClient
         @config=config
     end
 
+
+    def send_client_shutdown
+        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
+        ready_msg=@handler.pack(FuzzMessage.new({
+            :verb=>"CLIENT SHUTDOWN",
+            :station_id=>@config["AGENT NAME"],
+            :data=>""}).to_yaml)
+        send_data ready_msg
+    end
+
+    def send_client_startup
+        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
+        ready_msg=@handler.pack(FuzzMessage.new({
+            :verb=>"CLIENT STARTUP",
+            :station_id=>@config["AGENT NAME"],
+            :data=>""}).to_yaml)
+        send_data ready_msg
+        @connect=EventMachine::DefaultDeferrable.new
+        @connect.timeout(@config["POLL INTERVAL"])
+        @connect.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_ready
+        end
+    end
+
     def send_client_ready(data='')
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         ready_msg=@handler.pack(FuzzMessage.new({
             :verb=>"CLIENT READY",
             :station_id=>@config["AGENT NAME"],
             :data=>data}).to_yaml)
-            send_data ready_msg
-            @connect=EventMachine::DefaultDeferrable.new
-            @connect.timeout(@config["POLL INTERVAL"])
-            @connect.errback do
-                puts "Fuzzclient: Connection timed out. Retrying."
-                send_client_ready
-            end
+        send_data ready_msg
+        @connect=EventMachine::DefaultDeferrable.new
+        @connect.timeout(@config["POLL INTERVAL"])
+        @connect.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_ready
+        end
     end
 
     def deliver(data,msg_id)
@@ -97,14 +123,15 @@ module FuzzClient
                 unless @word.connected?
                     print "!#{current_pid}!";$stdout.flush
                     File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-                    status="CRASH"
+                    status="CRASH" # probably not, but better safe than sorry.
                 else
                     print(".");$stdout.flush
                     status="SUCCESS"
                 end
                 @word.close
             rescue 
-                if $!.message =~ /CRASH/m # a process id that went away
+                if $!.message =~ /CRASH/m # conn_office thinks this is a true crash.
+                    # This is the only case so far I am sure is real.
                     print "<#{$!.message}>";$stdout.flush
                     File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
                     status="CRASH"
@@ -117,7 +144,7 @@ module FuzzClient
         rescue
             print "!#{current_pid}!";$stdout.flush
             File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-            status="CRASH"
+            status="CRASH" # probably not really, but you never know.
         end
         @word=nil
         status
@@ -126,8 +153,10 @@ module FuzzClient
     def post_init
         @handler=NetStringTokenizer.new
         @sent=0
+        @template=""
         puts "FuzzClient: Starting up..."
-        send_client_ready ""
+        send_client_startup
+        at_exit {send_client_shutdown}
     end
 
     def receive_data(data)
@@ -137,7 +166,8 @@ module FuzzClient
             case msg.verb
             when "DELIVER"
                 begin
-                    status=deliver(msg.data,msg.id)
+                    fuzzfile=Diff::LCS.patch(@template,msg.data)
+                    status=deliver(fuzzfile,msg.id)
                 rescue
                     status="ERROR"
                     raise RuntimeError, "Something is fucked. Dying #{$!}"
@@ -146,6 +176,9 @@ module FuzzClient
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
                 EventMachine::stop_event_loop
+            when "TEMPLATE"
+                @template=msg.data
+                send_client_ready ""
             else
                 raise RuntimeError, "Unknown Command!"
             end
