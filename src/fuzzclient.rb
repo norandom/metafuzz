@@ -103,7 +103,7 @@ module FuzzClient
             @connect.timeout(@config["POLL INTERVAL"])
             @connect.errback do
                 puts "Fuzzclient: Connection timed out. Retrying."
-                send_client_ready data
+                send_client_ready
             end
     end
 
@@ -201,7 +201,7 @@ module FuzzClient
                 EventMachine::stop_event_loop
             when "TEMPLATE"
                 @template=msg.data
-                send_client_ready ""
+                send_client_ready
             else
                 raise RuntimeError, "Unknown Command!"
             end
