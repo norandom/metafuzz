@@ -160,7 +160,6 @@ module FuzzServer
         end
         if @production_queue.empty? and @production_queue.finished?
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
-            @clients-=1
             EventMachine::stop_event_loop if clients <= 0
         else
             # define a block to prepare the response

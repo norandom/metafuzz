@@ -26,6 +26,7 @@ Dir.glob("#{CRASHFILE_PATH}/crash*.doc").each {|currentfile|
     begin
         unless File.directory? CRASHFILE_PATH+"/#{hsh}"
             Dir.mkdir(CRASHFILE_PATH+"/#{hsh}")
+            File.open(File.join(CRASHFILE_PATH+"/#{hsh}","crashdetail.txt"), "wb+") {|io| io.write(out)}
         end
         FileUtils.mv(currentfile,CRASHFILE_PATH+"/#{hsh}")
     rescue
