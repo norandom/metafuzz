@@ -74,7 +74,7 @@ module FuzzClient
             :verb=>"CLIENT SHUTDOWN",
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-        send_data ready_msg
+            send_data ready_msg
     end
 
     def send_client_startup
@@ -83,28 +83,43 @@ module FuzzClient
             :verb=>"CLIENT STARTUP",
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-        send_data ready_msg
-        @connect=EventMachine::DefaultDeferrable.new
-        @connect.timeout(@config["POLL INTERVAL"])
-        @connect.errback do
-            puts "Fuzzclient: Connection timed out. Retrying."
-            send_client_ready
-        end
+            send_data ready_msg
+            @connect=EventMachine::DefaultDeferrable.new
+            @connect.timeout(@config["POLL INTERVAL"])
+            @connect.errback do
+                puts "Fuzzclient: Connection timed out. Retrying."
+                send_client_startup
+            end
     end
 
-    def send_client_ready(data='')
+    def send_client_ready
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         ready_msg=@handler.pack(FuzzMessage.new({
             :verb=>"CLIENT READY",
             :station_id=>@config["AGENT NAME"],
+            :data=>""}).to_yaml)
+            send_data ready_msg
+            @connect=EventMachine::DefaultDeferrable.new
+            @connect.timeout(@config["POLL INTERVAL"])
+            @connect.errback do
+                puts "Fuzzclient: Connection timed out. Retrying."
+                send_client_ready data
+            end
+    end
+
+    def send_result(data='')
+        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
+        ready_msg=@handler.pack(FuzzMessage.new({
+            :verb=>"CLIENT RESULT",
+            :station_id=>@config["AGENT NAME"],
             :data=>data}).to_yaml)
-        send_data ready_msg
-        @connect=EventMachine::DefaultDeferrable.new
-        @connect.timeout(@config["POLL INTERVAL"])
-        @connect.errback do
-            puts "Fuzzclient: Connection timed out. Retrying."
-            send_client_ready
-        end
+            send_data ready_msg
+            @connect=EventMachine::DefaultDeferrable.new
+            @connect.timeout(@config["POLL INTERVAL"])
+            @connect.errback do
+                puts "Fuzzclient: Connection timed out. Retrying."
+                send_result data
+            end
     end
 
     def deliver(data,msg_id)
@@ -165,24 +180,22 @@ module FuzzClient
             msg=FuzzMessage.new(m)
             case msg.verb
             when "DELIVER"
-
-                    #fuzzfile=Diff::LCS.patch(@template,msg.data)
-                    fuzzfile=msg.data
-                    send_to_word=proc do
-                      begin
+                #fuzzfile=Diff::LCS.patch(@template,msg.data)
+                fuzzfile=msg.data
+                send_to_word=proc do
+                    begin
                         status=deliver(fuzzfile,msg.id)
-                      rescue
+                    rescue
                         status="ERROR"
                         raise RuntimeError, "Something is fucked. Dying #{$!}"
-                      end
-                      "#{msg.id}:#{status}"
                     end
-                    callback=proc do |result|
-                      send_client_ready result
-                      end
+                    "#{msg.id}:#{status}"
+                end
+                callback=proc do |result|
+                    send_result result
+                    send_client_ready
+                end
                 EM.defer(send_to_word,callback)
-                #send_client_ready "#{msg.id}:#{status}"
-                #send_client_ready ""
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
                 EventMachine::stop_event_loop

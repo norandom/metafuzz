@@ -47,7 +47,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,8,8)
+        g=Generators::RollingCorrupt.new(raw_fib,16,16)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -153,15 +153,28 @@ module FuzzServer
         at_exit {@result_tracker.spit_results}
     end
 
-    def handle_client_ready(msg)
-        unless msg.data.empty? # first request
+
+    def handle_client_result(msg)
             result_id,result_status=msg.data.split(':')
             @result_tracker.add_result(Integer(result_id),result_status)
-        end
+    end
+
+    def handle_client_ready(msg)
         if @production_queue.empty? and @production_queue.finished?
+            puts "All done, waiting to shut down..."
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
-            EventMachine::stop_event_loop if clients <= 0
+            20.times do
+                EventMachine::stop_event_loop if clients <= 0
+                sleep(5)
+            end
+            EventMachine::stop_event_loop
         else
+=begin
+                my_data=@production_queue.pop
+                id=@result_tracker.check_out
+                #diffs=Diff::LCS.diff(@template,my_data)
+                send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
+=end
             # define a block to prepare the response
             get_data=proc do
                 # This pop will block until data is available
@@ -169,8 +182,8 @@ module FuzzServer
                 my_data=@production_queue.pop
                 id=@result_tracker.check_out
                 # This is what will be passed to the callback
-                diffs=Diff::LCS.diff(@template,my_data)
-                @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>diffs,:id=>id}).to_yaml)
+                #diffs=Diff::LCS.diff(@template,my_data)
+                @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
             end
             # This callback will be invoked once the response is ready.
             callback=proc do |data|
@@ -184,18 +197,22 @@ module FuzzServer
     def handle_client_startup
         send_data @handler.pack(FuzzMessage.new({:verb=>"TEMPLATE",:data=>@template}).to_yaml)
         @clients+=1
+        puts "#{@clients} clients..."
     end
 
     def handle_client_shutdown
         @clients-=1
+        puts "#{@clients} clients..."
     end
 
     def receive_data(data)
         @handler.parse(data).each do |m| 
             msg=FuzzMessage.new(m)
             case msg.verb
+            when "CLIENT RESULT"
+                handle_client_result(msg)
             when "CLIENT READY"
-                handle_client_ready(msg)
+                handle_client_ready
             when "CLIENT STARTUP"
                 handle_client_startup
             when "CLIENT SHUTDOWN"
