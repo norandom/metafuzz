@@ -99,15 +99,6 @@ module FuzzClient
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
             send_data ready_msg
-<<<<<<< .mine
-=======
-            @connect=EventMachine::DefaultDeferrable.new
-            @connect.timeout(@config["POLL INTERVAL"])
-            @connect.errback do
-                puts "Fuzzclient: Connection timed out. Retrying."
-                send_client_ready
-            end
->>>>>>> .r57
     end
 
     def send_result(data='')
