@@ -3,7 +3,6 @@ require 'fileutils'
 require 'Win32API'
 require 'win32/process'
 require 'windows_manipulation'
-include WindowOperations
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
