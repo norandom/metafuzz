@@ -66,12 +66,13 @@ class WindowOperations
     end
 
     def send_window_message(hwnd, message)
+        puts "in swm, trying to send #{message} to #{hwnd}"
         post_message = User32['PostMessage', 'ILILL']
         r,rs=post_message.call(hwnd,message,0,0)
     end
 
 end #module WindowOperations
-
+=begin
 wm=WindowOperations.new
 my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
 my_result.each {|word_hwnd,child|
@@ -79,11 +80,26 @@ my_result.each {|word_hwnd,child|
     child[:children]=children
 }
 pp my_result
-
+    my_result.each {|k,v|
+        if v[:children]
+            v[:children].each {|k,v|
+                if v[:classname]=~/bosa_sdm/
+                    puts "Sending kill to #{k}"
+                    wm.send_window_message(k, 0x0010)
+                end
+                if v[:classname]=~/32770/
+                    wm.switch_to_window(k)
+                    wm.do_child_windows(k) {|k,v| v[:classname]=="Button" and (v[:caption]=="OK" or v[:caption]=="&No")}.each {|k,v|
+                        wm.send_window_message(k, BMCLICK)
+                    }
+                end
+            }
+        end
+    }
 my_result.each {|k,v|
     children=wm.do_child_windows(k)
     #pp children
 }
-
+=end
 
 
