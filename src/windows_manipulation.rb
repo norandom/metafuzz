@@ -18,6 +18,10 @@ class WindowOperations
         @classname_buffer=' '*32 # class names are limited to 32 bytes
     end
 
+    def switch_to_window(hwnd)
+        @switch_to_window.call(hwnd,1)
+    end
+
     def do_child_windows(hwnd, &blk)
         #This doesn't do what I expect, in that if you call enum_windows and look for windows that
         # have parent x, the results are different to calling enum_child_windows(hwnd(x))
@@ -68,20 +72,18 @@ class WindowOperations
 
 end #module WindowOperations
 
-=begin
 wm=WindowOperations.new
 my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
-my_result.each {|k,v|
-    children=wm.do_enum_windows {|k,v| v[:parent_window]==k}
-    v[:children]=children
+my_result.each {|word_hwnd,child|
+    children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
+    child[:children]=children
 }
 pp my_result
 
 my_result.each {|k,v|
-    children=wm.do_child_windows(k) {|k,v| v[:classname]=~/MsoWorkPane/}
-    pp children
+    children=wm.do_child_windows(k)
+    #pp children
 }
-=end
 
 
 
