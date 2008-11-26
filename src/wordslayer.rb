@@ -5,7 +5,7 @@ require 'windows_manipulation'
 require 'pp'
 
 BMCLICK=0x00F5
-WM_DESTROY=0x001
+WM_DESTROY=0x0010
 
 def get_process_array(wmi)
     processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
@@ -33,6 +33,7 @@ def delete_temp_files
 end
 
 def kill_dialog_boxes(wm)
+
     my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
     my_result.each {|word_hwnd,child|
         children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
@@ -57,10 +58,10 @@ def kill_dialog_boxes(wm)
 end
 
 dialog_killer=Thread.new do
-    wm=WindowOperations.new
+      wm=WindowOperations.new
     loop do 
         begin
-            kill_dialog_boxes(wm) 
+            kill_dialog_boxes(wm)
         rescue 
             puts $!
         end
