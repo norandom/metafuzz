@@ -174,6 +174,8 @@ module FuzzClient
                         status=deliver(fuzzfile,msg.id)
                     rescue
                         status="ERROR"
+                        puts $!
+                        EventMachine::stop_event_loop
                         raise RuntimeError, "Something is fucked. Dying #{$!}"
                     end
                     "#{msg.id}:#{status}"
@@ -185,6 +187,7 @@ module FuzzClient
                 EM.defer(send_to_word,callback)
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
+                send_client_shutdown
                 EventMachine::stop_event_loop
             when "TEMPLATE"
                 @initial_connect.succeed

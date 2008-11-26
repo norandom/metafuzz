@@ -47,7 +47,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,16,16)
+        g=Generators::RollingCorrupt.new(raw_fib,23,23)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -89,8 +89,11 @@ prod_thread=Thread.new do
 end
 =end
 class ResultTracker
+    attr_accessor :clients
+
     def initialize
         @sent=0
+        @clients=0
         @mutex=Mutex.new
         @results={}
         @time_mark=Time.now
@@ -135,7 +138,7 @@ class ResultTracker
             @time_mark=Time.now
         end
         puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
-        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%((@sent-@sent_mark)/(Time.now-@time_mark).to_f)}/s)"
+        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%((@sent-@sent_mark)/(Time.now-@time_mark).to_f)}/s #{@clients} current clients)"
     ensure
         Thread.critical=false
     end
@@ -148,7 +151,7 @@ module FuzzServer
         @template=@production_queue.template
         @result_tracker=rt
         @handler=NetStringTokenizer.new
-        @clients=0
+        @result_tracker.clients=0
         EM.add_periodic_timer(30) {@result_tracker.spit_results}
         at_exit {@result_tracker.spit_results}
     end
@@ -161,13 +164,7 @@ module FuzzServer
 
     def handle_client_ready
         if @production_queue.empty? and @production_queue.finished?
-            puts "All done, waiting to shut down..."
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
-            20.times do
-                EventMachine::stop_event_loop if clients <= 0
-                sleep(5)
-            end
-            EventMachine::stop_event_loop
         else
 =begin
                 my_data=@production_queue.pop
@@ -196,13 +193,15 @@ module FuzzServer
 
     def handle_client_startup
         send_data @handler.pack(FuzzMessage.new({:verb=>"TEMPLATE",:data=>@template}).to_yaml)
-        @clients+=1
-        puts "#{@clients} clients..."
+        @result_tracker.clients+=1
     end
 
     def handle_client_shutdown
-        @clients-=1
-        puts "#{@clients} clients..."
+        @result_tracker.clients-=1
+        if @production_queue.empty? and @production_queue.finished? and @result_tracker.clients <=0
+            puts "All done, shutting down."
+            EventMachine::stop_event_loop
+        end
     end
 
     def receive_data(data)

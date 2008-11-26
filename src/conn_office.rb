@@ -3,7 +3,7 @@ require 'fileutils'
 require 'Win32API'
 require 'win32/process'
 require 'windows_manipulation'
-  include WindowOperations
+include WindowOperations
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
@@ -43,6 +43,7 @@ module CONN_OFFICE
         @appname, @path = @module_args
         @path||=File.dirname(File.expand_path(__FILE__)) # same directory as the script is running from
         @files=[]
+        @wm=WindowOperations.new
         begin
             @app=WIN32OLE.new(@appname+'.Application')
             #@app.visible=true # for now.
@@ -78,9 +79,9 @@ module CONN_OFFICE
         rescue
             if $!.message =~ /OLE error code:0 .*The server threw an exception/m # the OLE server threw an exception, might be a genuine crash.
                 begin
-                  Process.kill(9,@pid) # So we don't have to wait for wordslayer to step in...
+                    Process.kill(9,@pid) # So we don't have to wait for wordslayer to step in...
                 rescue
-                  nil
+                    nil
                 end
                 raise RuntimeError, "CRASH:#{@pid}"
             else # Either it's an OLE "the doc was corrupt" error, or the app hung, we killed it with -1 and got RPC server unavailable.
@@ -100,20 +101,23 @@ module CONN_OFFICE
         end		
     end
 
-def dialog_boxes
-  children=WindowOperations::do_enum_windows("parentwindow==#{@wid}")
-  children.length > 0
-end
+    def dialog_boxes
+        Thread.critical=true
+        children=@wm.do_enum_windows {|k,v| v[:parent_window]=@wid}
+        children.length > 0
+    ensure 
+        Thread.critical=false
+    end
 
     #Cleanly destroy the app. 
     def destroy_connection
         begin
             @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
-           begin
+            begin
                 if is_connected?
                     sleep(1) while dialog_boxes
                     @app.Quit
-                  end
+                end
             rescue
                 puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
             end
