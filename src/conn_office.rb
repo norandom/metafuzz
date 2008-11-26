@@ -111,10 +111,14 @@ module CONN_OFFICE
     #Cleanly destroy the app. 
     def destroy_connection
         begin
+            print '1';$stdout.flush
             @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
+            print '1';$stdout.flush
             begin
                 if is_connected?
+            print '2';$stdout.flush
                     sleep(1) while dialog_boxes
+            print '2';$stdout.flush
                     @app.Quit
                 end
             rescue
