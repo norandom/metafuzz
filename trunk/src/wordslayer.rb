@@ -4,6 +4,9 @@ require 'fileutils'
 require 'windows_manipulation'
 require 'pp'
 
+BMCLICK=0x00F5
+WM_DESTROY=0x001
+
 def get_process_array(wmi)
     processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
     ary=[]
@@ -29,37 +32,35 @@ def delete_temp_files
     }
 end
 
-def kill_dialog_boxes
-    my_result=WindowOperations::do_enum_windows('classname=~/OpusApp/')
-    my_result.each {|k,v|
-        children=WindowOperations::do_enum_windows("parentwindow==#{k}")
-        v << children
+def kill_dialog_boxes(wm)
+    my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
+    my_result.each {|word_hwnd,child|
+        children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
+        child[:children]=children
     }
-
+    # my_result is now Word windows with their toplevel children
     my_result.each {|k,v|
-        v[3].each {|k,v|
-            if v[1]=~/bosa_sdm/ # dialog box, like Show Repairs or password prompt for encrypted file
-                # These guys don't expose their buttons as children, you just have to tell them to die.
-                WindowOperations::send_window_message(k,WM_DESTROY)
-            end
-            if v[1]=~/32770/ # alert, like 'too big to save' or 'do you want to download a converter'
-                alert_stuff=do_child_windows(k)
-                switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-                switch_to_window.call(k,1)
-                alert_stuff.each {|k,v|
-                    if v[0]=="Button" and (v[1]=="OK" or v[1]=="&No")
-                        WindowOperations::send_window_message(k,BMCLICK)
-                    end
-                }
-            end
-        }
+        if v[:children]
+            v[:children].each {|k,v|
+                if v[:classname]=~/bosa_sdm/
+                    wm.send_window_message(k, WM_DESTROY)
+                end
+                if v[:classname]=~/32770/
+                    wm.switch_to_window(k)
+                    wm.do_child_windows(k) {|k,v| v[:classname]=="Button" and (v[:caption]=="OK" or v[:caption]=="&No")}.each {|k,v|
+                        wm.send_window_message(k, BMCLICK)
+                    }
+                end
+            }
+        end
     }
 end
 
 dialog_killer=Thread.new do
+    wm=WindowOperations.new
     loop do 
         begin
-            kill_dialog_boxes 
+            kill_dialog_boxes(wm) 
         rescue 
             puts $!
         end
