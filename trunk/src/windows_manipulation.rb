@@ -1,4 +1,5 @@
 require 'pp'
+# I AM NOT THREAD SAFE!
 class WindowOperations
 
     require 'dl'
@@ -48,6 +49,7 @@ class WindowOperations
     end
 
     def do_enum_windows(&blk)
+        blk||=proc do true end
         results={}
         @enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
             r,rs = @get_class_name.call(hwnd, @classname_buffer, @classname_buffer.size)
@@ -80,6 +82,24 @@ my_result.each {|word_hwnd,child|
     child[:children]=children
 }
 pp my_result
+<<<<<<< .mine
+    my_result.each {|k,v|
+        if v[:children]
+            v[:children].each {|k,v|
+                if v[:classname]=~/bosa_sdm/
+                    wm.send_window_message(k, 0x0010)
+                end
+                if v[:classname]=~/32770/
+                    wm.switch_to_window(k)
+                    wm.do_child_windows(k) {|k,v| v[:classname]=="Button" and (v[:caption]=="OK" or v[:caption]=="&No")}.each {|k,v|
+                        wm.send_window_message(k, BMCLICK)
+                    }
+                end
+            }
+        end
+    }
+=begin
+=======
     my_result.each {|k,v|
         if v[:children]
             v[:children].each {|k,v|
@@ -96,9 +116,10 @@ pp my_result
             }
         end
     }
+>>>>>>> .r66
 my_result.each {|k,v|
     children=wm.do_child_windows(k)
-    #pp children
+    pp children
 }
 =end
 
