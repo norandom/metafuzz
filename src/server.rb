@@ -7,6 +7,63 @@ require 'fuzzer'
 require 'fib'
 require 'diff/lcs'
 
+
+default_config={"AGENT NAME"=>"SERVER",
+    "SERVER IP"=>"0.0.0.0",
+    "SERVER PORT"=>10000,
+    "WORK DIR"=>'C:\fuzzserver',
+    "CONFIG DIR"=>'C:\fuzzserver',
+    "COMPRESSION"=>false,
+    "SEND DIFFS ONLY"=>false,
+    "USE THREADPOOL"=>true,
+    "POLL INTERVAL"=>5
+}
+
+config_file=ARGV[0]
+if config_file and not File.exists? config_file
+    puts "FuzzServer: Bad config file #{config_file}, using default config."
+    config=default_config
+elsif not config_file
+    puts "FuzzServer: Using default config."
+    config=default_config
+else
+    begin
+        config_data=File.open(config_file, "r") {|io| io.read}
+        config=YAML::load(config_data)
+    rescue
+        puts "FuzzServer: Bad config file #{config_file}, using default config."
+        config=default_config
+    end
+end
+
+["CONFIG DIR","WORK DIR"].each { |dirname|
+    unless File.directory? config[dirname]
+        print "Directory #{dirname} doesn't exist. Create it? [y/n]: "
+        answer=STDIN.gets.chomp
+        if answer =~ /^[yY]/
+            begin
+                Dir.mkdir(config[dirname])
+            rescue
+                raise RuntimeError, "FuzzServer: Couldn't create directory: #{$!}"
+            end
+        else
+            raise RuntimeError, "FuzzServer: #{dirname} unavailable. Exiting."
+        end
+    end
+}
+
+at_exit {
+    print "Saving config to #{config["CONFIG DIR"]}..."
+    begin
+        File.open(File.join(config["CONFIG DIR"],"fuzzserver_config.txt"),"w+") { |io|
+            io.write(YAML::dump(config))
+        }
+    rescue
+        puts "FuzzServer: Couldn't write out config."
+    end
+    print "Done. Exiting.\n"
+}
+
 prod_queue=SizedQueue.new(20)
 # Quickly patch the queue object to add a finished? method
 # Couldn't think of anything more elegant.
@@ -47,7 +104,8 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,23,23)
+        g=Generators::RollingCorrupt.new(raw_fib,16,8)
+        180.times do g.next end
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -146,7 +204,8 @@ end
 
 module FuzzServer
 
-    def initialize(prod_queue, rt)
+    def initialize(prod_queue, rt, config)
+        @config=config
         @production_queue=prod_queue
         @template=@production_queue.template
         @result_tracker=rt
@@ -158,36 +217,45 @@ module FuzzServer
 
 
     def handle_client_result(msg)
-            result_id,result_status=msg.data.split(':')
-            @result_tracker.add_result(Integer(result_id),result_status)
+        result_id,result_status=msg.data.split(':')
+        @result_tracker.add_result(Integer(result_id),result_status)
     end
 
     def handle_client_ready
         if @production_queue.empty? and @production_queue.finished?
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
         else
-=begin
+            if @config["USE THREADPOOL"]
                 my_data=@production_queue.pop
                 id=@result_tracker.check_out
-                #diffs=Diff::LCS.diff(@template,my_data)
-                send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
-=end
-            # define a block to prepare the response
-            get_data=proc do
-                # This pop will block until data is available
-                # but since we are using EM.defer that's OK
-                my_data=@production_queue.pop
-                id=@result_tracker.check_out
-                # This is what will be passed to the callback
-                #diffs=Diff::LCS.diff(@template,my_data)
-                @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
+                if @config["SEND DIFFS"]
+                    diffs=Diff::LCS.diff(@template,my_data)
+                    send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>diffs,:id=>id}).to_yaml)
+                else
+                    send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
+                end
+            else
+                # define a block to prepare the response
+                get_data=proc do
+                    # This pop will block until data is available
+                    # but since we are using EM.defer that's OK
+                    my_data=@production_queue.pop
+                    id=@result_tracker.check_out
+                    # This is what will be passed to the callback
+                    if @config["SEND DIFFS"]
+                        diffs=Diff::LCS.diff(@template,my_data)
+                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>diffs,:id=>id}).to_yaml)
+                    else
+                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
+                    end
+                end
+                # This callback will be invoked once the response is ready.
+                callback=proc do |data|
+                    send_data data
+                end
+                # Send the work to the thread queue, so we are ready for more connections.
+                EM.defer(get_data, callback)
             end
-            # This callback will be invoked once the response is ready.
-            callback=proc do |data|
-                send_data data
-            end
-            # Send the work to the thread queue, so we are ready for more connections.
-            EM.defer(get_data, callback)
         end
     end
 
@@ -216,6 +284,9 @@ module FuzzServer
                 handle_client_startup
             when "CLIENT SHUTDOWN"
                 handle_client_shutdown
+            else
+                #unknown command, real programmer would error handle.
+                nil
             end
         end
     end
@@ -224,6 +295,6 @@ end
 
 rt=ResultTracker.new
 EventMachine::run {
-    EventMachine::start_server("0.0.0.0", 10000, FuzzServer, prod_queue, rt)
+    EventMachine::start_server(config["SERVER IP"], config["SERVER PORT"], FuzzServer, prod_queue, rt, config)
 }
 rt.spit_results

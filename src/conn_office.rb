@@ -104,7 +104,6 @@ module CONN_OFFICE
         Thread.critical=true
         children=@wm.do_enum_windows {|k,v| v[:parent_window]==@wid}
         children.length > 0
-        Thread.critical=false
         ensure
         Thread.critical=false
     end
