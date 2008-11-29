@@ -5,6 +5,7 @@ module WindowsPipe
     extend self
     $stdout.sync = true 
     NORMAL_PRIORITY_CLASS = 0x00000020 
+    CREATE_NEW_PROCESS_GROUP=0x00000200
     STARTUP_INFO_SIZE = 68 
     PROCESS_INFO_SIZE = 16 
     SECURITY_ATTRIBUTES_SIZE = 12 
@@ -84,8 +85,12 @@ module WindowsPipe
             processInfo = [0, 0, 0, 0].pack('IIII') 
             command << 0 
             createProcess = Win32API.new("kernel32", "CreateProcess", params, 'I') 
-            raise_last_win_32_error if createProcess.call(0, 
-                                                          command, 0, 0, 1, 0, 0, 0, startupInfo, processInfo).zero? 
+            # The CREATE_NEW_PROCESS_GROUP flag allows me to send console events
+            # to the process group with kernel32!GenerateConsoleCtrlEvent
+            # which is important if you want to send CTRL-BREAK to a debugger.
+            raise_last_win_32_error if createProcess.call(0, command, 0, 0, 1, 
+                                                          CREATE_NEW_PROCESS_GROUP, 0, 
+                                                          0, startupInfo, processInfo).zero? 
             hProcess, hThread, dwProcessId, dwThreadId = processInfo.unpack('LLLL') 
             close_handle(hProcess) 
             close_handle(hThread) 
@@ -131,10 +136,12 @@ module WindowsPipe
             available.unpack('I')[0] 
     end 
     class Win32popenIO 
-        def initialize (hRead, hWrite) 
+        attr_reader :pid
+        def initialize (hRead, hWrite, pid) 
             extend WindowsPipe
             @hRead = hRead 
             @hWrite = hWrite 
+            @pid=pid
         end 
         def write data 
             write_file(@hWrite, data.to_s) 
@@ -161,13 +168,14 @@ module WindowsPipe
         set_handle_information(child_in_w, HANDLE_FLAG_INHERIT, 0) 
         set_handle_information(child_out_r, HANDLE_FLAG_INHERIT, 0) 
         set_handle_information(child_error_r, HANDLE_FLAG_INHERIT, 0) 
-        processId, threadId = create_process(ENV['ComSpec'] + ' /C ' + 
-                                             command, child_in_r, child_out_w, child_error_w) 
+        #processId, threadId = create_process(ENV['ComSpec'] + ' /C ' + 
+        #                                     command, child_in_r, child_out_w, child_error_w) 
+        processId, threadId = create_process(command, child_in_r, child_out_w, child_error_w) 
         # we have to close the handles, so the pipes terminate with the process 
         close_handle(child_in_r) 
         close_handle(child_out_w) 
         close_handle(child_error_w) 
-        Win32popenIO.new(child_out_r, child_in_w) 
+        Win32popenIO.new(child_out_r, child_in_w, processId) 
     end 
 end # module WindowsPipe
 if $0 == __FILE__ 
