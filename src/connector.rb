@@ -16,6 +16,10 @@ require 'thread'
 #New protocol modules should take care to overload the mandatory functions (see
 #the included modules for examples) and should take care of their own error handling
 #because more or less none is done by Connector.
+#
+#When finished with a Connector object you should call Connector#close, otherwise the
+#receive thread will hang around which can cause large memory leaks if you create many
+#Connectors.
 class Connector
 
   QUEUE_MAXLEN=128
@@ -65,6 +69,7 @@ class Connector
     blocking_write String(data)
   end
 
+  #This will block until a response is received! Be prepared.
   def sr( item )
     begin
       deliver item
@@ -72,7 +77,7 @@ class Connector
       reconnect
       deliver item
     end
-    5.times do
+    loop do
       break unless q_empty?
       sleep 0.05
     end
