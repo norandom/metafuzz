@@ -132,6 +132,14 @@ class Connector
   end
   alias dq_all dequeue_all
 
+  #Take a copy of the queue but leave the items in place.
+  def queue_copy_all
+      @queue_mutex.synchronize {
+          @queue[0..-1]
+      }
+  end
+  alias qc_all queue_copy_all
+
   #Close the connection to the remote host. For some protocols this just closes the
   #local socket, for connection-oriented protocols like TCP it will reset the connection
   #with the peer.
