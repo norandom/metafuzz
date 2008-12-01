@@ -106,7 +106,6 @@ production=Thread.new do
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
         g=Generators::RollingCorrupt.new(raw_fib,16,8)
-        180.times do g.next end
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length

@@ -136,7 +136,8 @@ module FuzzClient
                 print '.';$stdout.flush
             rescue
                 # check AV status
-                sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
+                #sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
+                Thread.pass
                 if debugger.crash?
                     status="CRASH"
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
@@ -155,51 +156,8 @@ module FuzzClient
             raise RuntimeError, "Delivery: fuck this. #{$!}"
         end
     end
-=begin
-    def deliver(data,msg_id)
-        status=false
-        begin
-            begin
-                begin
-                    @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
-                    @word.connected?
-                rescue
-                    raise RuntimeError, "Couldn't establish connection to app. #{$!}"
-                end
-                current_pid=@word.pid
-                @data=data
-                @word.deliver data
-                unless @word.connected?
-                    print "!#{current_pid}!";$stdout.flush
-                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-                    status="CRASH" # probably not, but better safe than sorry.
-                else
-                    print(".");$stdout.flush
-                    status="SUCCESS"
-                end
-                @word.close
-            rescue 
-                if $!.message =~ /CRASH/m # conn_office thinks this is a true crash.
-                    # This is the only case so far I am sure is real.
-                    print "<#{$!.message}>";$stdout.flush
-                    File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-                    status="CRASH"
-                else
-                    print "#";$stdout.flush
-                    status="FAIL"
-                end
-                @word.close
-            end
-        rescue
-            print "!#{current_pid}!";$stdout.flush
-            File.open(File.join(@config["WORK DIR"],"crash"+self.object_id.to_s+'-'+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-            status="CRASH" # probably not really, but you never know.
-        end
-        @word=nil
-        status
-    end
-=end
-    def post_init
+
+   def post_init
         @handler=NetStringTokenizer.new
         @sent=0
         @template=""
