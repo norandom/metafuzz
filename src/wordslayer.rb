@@ -63,7 +63,7 @@ dialog_killer=Thread.new do
         begin
             kill_dialog_boxes(wm)
         rescue 
-            puts $!
+            puts "Wordslayer: DK: #{$!}"
         end
         sleep(0.5)
     end
@@ -94,7 +94,7 @@ begin
         sleep(5)
     end
 rescue
-    puts $!
+    puts "Wordslayer: PK: #{$!}"
     sleep(5)
     retry
 end
