@@ -119,7 +119,6 @@ module FuzzClient
             @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
             @word.connected?
             current_pid=@word.pid
-            puts "Word created, PID #{current_pid}"
         rescue
             raise RuntimeError, "Couldn't establish connection to app. #{$!}"
         end
@@ -129,7 +128,6 @@ module FuzzClient
         # -pb don't request an initial break
         # -x ignore first chance exceptions
         # -xi ld ignore module loads
-        puts "Trying to attach to #{current_pid}"
         debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
         begin
             @word.deliver data
