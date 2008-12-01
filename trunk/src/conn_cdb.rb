@@ -87,6 +87,7 @@ module CONN_CDB
     end
 
     def crash?
+        sleep(0.5)
         state=qc_all.join
         state=~/second chance/
     end
