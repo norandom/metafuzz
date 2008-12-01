@@ -131,6 +131,7 @@ module FuzzClient
         # -xi ld ignore module loads
         puts "Trying to attach to #{current_pid}"
         debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
+        p debugger
         puts debugger.dq_all.join
         begin
             @word.deliver data
