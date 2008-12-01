@@ -114,45 +114,45 @@ module FuzzClient
 
     def deliver(data,msg_id)
         begin
-        status="ERROR"
-        @data=data
-        begin
-            @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
-            @word.connected?
-            current_pid=@word.pid
-        rescue
-            raise RuntimeError, "Couldn't establish connection to app. #{$!}"
-        end
-        # Attach debugger
-        # -snul - don't load symbols
-        # -hd don't use the debug heap
-        # -pb don't request an initial break
-        # -x ignore first chance exceptions
-        # -xi ld ignore module loads
-        debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
-        begin
-            @word.deliver data
-            status="SUCCESS"
-            print '.';$stdout.flush
-        rescue
-            # check AV status
-            sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
-            if (debugger.dq_all.join rescue nil) =~/second chance/
-              status="CRASH"
-                File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
-                print '!';$stdout.flush
-            else
-                status="FAIL"
-                print '#';$stdout.flush
+            status="ERROR"
+            @data=data
+            begin
+                @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+                @word.connected?
+                current_pid=@word.pid
+            rescue
+                raise RuntimeError, "Couldn't establish connection to app. #{$!}"
             end
-        end
-        # close the debugger and kill the app
-        @word.close rescue nil
-        debugger.close
-        @word=nil
-        status
+            # Attach debugger
+            # -snul - don't load symbols
+            # -hd don't use the debug heap
+            # -pb don't request an initial break
+            # -x ignore first chance exceptions
+            # -xi ld ignore module loads
+            debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
+            begin
+                @word.deliver data
+                status="SUCCESS"
+                print '.';$stdout.flush
+            rescue
+                # check AV status
+                sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
+                if debugger.crash?
+                    status="CRASH"
+                    File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
+                    print '!';$stdout.flush
+                else
+                    status="FAIL"
+                    print '#';$stdout.flush
+                end
+            end
+            # close the debugger and kill the app
+            @word.close rescue nil
+            debugger.close
+            @word=nil
+            status
         rescue
-        raise RuntimeError, "Delivery: fuck this. #{$!}"
+            raise RuntimeError, "Delivery: fuck this. #{$!}"
         end
     end
 =begin
@@ -215,16 +215,16 @@ module FuzzClient
             when "DELIVER"
                 #fuzzfile=Diff::LCS.patch(@template,msg.data)
                 fuzzfile=msg.data
-                    begin
-                        status=deliver(fuzzfile,msg.id)
-                    rescue
-                        status="ERROR"
-                        puts $!
-                        EventMachine::stop_event_loop
-                        raise RuntimeError, "Something is fucked. Dying #{$!}"
-                    end
-                    send_result "#{msg.id}:#{status}"
-                    send_client_ready
+                begin
+                    status=deliver(fuzzfile,msg.id)
+                rescue
+                    status="ERROR"
+                    puts $!
+                    EventMachine::stop_event_loop
+                    raise RuntimeError, "Something is fucked. Dying #{$!}"
+                end
+                send_result "#{msg.id}:#{status}"
+                send_client_ready
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
                 send_client_shutdown
