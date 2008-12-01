@@ -93,6 +93,7 @@ class << prod_queue
         Thread.critical=false
     end
 end
+=begin
 production=Thread.new do
     begin
         header,raw_fib,rest=""
@@ -119,7 +120,7 @@ production=Thread.new do
         exit
     end
 end
-=begin
+=end
 prod_thread=Thread.new do
     begin
         puts "Production thread starting..."
@@ -145,7 +146,6 @@ prod_thread=Thread.new do
         exit
     end
 end
-=end
 class ResultTracker
     attr_accessor :clients
 

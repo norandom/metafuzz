@@ -234,10 +234,7 @@ module FuzzClient
             when "TEMPLATE"
                 @initial_connect.succeed
                 @template=msg.data
-                # Sending multiple ready messages here should kick in the thread pool
-                2.times do 
-                    send_client_ready
-                end
+                send_client_ready
             else
                 raise RuntimeError, "Unknown Command!"
             end
