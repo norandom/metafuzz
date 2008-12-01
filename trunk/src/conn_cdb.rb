@@ -39,6 +39,7 @@ module CONN_CDB
         begin
             @debugger=WindowsPipe.popen(CDB_PATH+@command_line)
             @child_pid=@debugger.pid
+            sleep 0.1 until @debugger.cq_all.join.length > 0
         rescue
             #do something
         end
