@@ -2,6 +2,7 @@ require 'windows_popen'
 require 'win32ole'
 CDB_PATH="\"C:\\Program Files\\Debugging Tools for Windows (x86)\\cdb.exe\" "
 require 'objhax'
+require 'win32/process'
 
 #Establish a connection to the Windows CDB debugger. CDB has all the features of WinDbg, but it uses
 #a simple command line interface.
@@ -65,10 +66,7 @@ module CONN_CDB
 
     #Cleanly destroy the socket. 
     def destroy_connection
-        if is_connected?
-            @generate_ctrl_event.call(1,@child_pid) # send a ctrl-break, in case the debugee is running          
-            @debugger.write("q\n") 
-        end
+      Process.kill(9,@child_pid) rescue nil
     end
     
     # Sugar from here on.
@@ -88,10 +86,9 @@ module CONN_CDB
     end
 
     def crash?
-        sleep(0.5)
-        state=qc_all.join
-        state=~/second chance/
-    end
+        qc_all.join=~/second chance/
+      end
+
 
     # Because this method is a point in time capture of the registers we flush
     # the queue.

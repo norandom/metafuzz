@@ -76,7 +76,6 @@ module CONN_OFFICE
             @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
             @app.visible
         rescue
-            destroy_connection
             raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"
         end
     end
@@ -102,18 +101,10 @@ module CONN_OFFICE
     #Cleanly destroy the app. 
     def destroy_connection
         begin
-            @app.Documents.each {|doc| doc.close(0) rescue nil} if is_connected? # otherwise there seems to be a file close race, and the files aren't deleted.
-            begin
-                if is_connected?
-                    sleep(1) while dialog_boxes
-                    @app.Quit
-                end
-            rescue
-                puts "CONN_OFFICE: destroy_connection app.Quit failed: #{$!}"
-            end
+Process.kill(9,@pid) rescue nil
         ensure
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
-            @files.each {|fn| FileUtils.rm_f(fn)}
+            @files.each {|fn| FileUtils.rm_f(fn) rescue nil}
         end
     end
 
