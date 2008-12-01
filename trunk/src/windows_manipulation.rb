@@ -68,7 +68,6 @@ class WindowOperations
     end
 
     def send_window_message(hwnd, message)
-        puts "in swm, trying to send #{message} to #{hwnd}"
         post_message = User32['PostMessage', 'ILILL']
         r,rs=post_message.call(hwnd,message,0,0)
     end
