@@ -66,9 +66,9 @@ module CONN_OFFICE
         begin
             filename="temp" + Time.now.hash.to_s + self.object_id.to_s + ".doc"
             filename=File.join(@path,filename)
-            @files << filename
             fso=WIN32OLE.new("Scripting.FileSystemObject")
             path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
+            @files << path
             File.open(path, "wb+") {|io| io.write(data)}
             # this call blocks, so if it opens a dialog box immediately we lose control of the app. 
             # This is the biggest issue, and so far can only be solved with a separate monitor app
