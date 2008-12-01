@@ -110,6 +110,46 @@ module FuzzClient
             send_data ready_msg
     end
 
+
+    def deliver(data,msg_id)
+        status="ERROR"
+        @data=data
+        begin
+            @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+            @word.connected?
+            current_pid=@word.pid
+            puts "Word created, PID #{current_pid}"
+        rescue
+            raise RuntimeError, "Couldn't establish connection to app. #{$!}"
+        end
+        # Attach debugger
+        # -snul - don't load symbols
+        # -hd don't use the debug heap
+        # -pb don't request an initial break
+        # -x ignore first chance exceptions
+        # -xi ld ignore module loads
+        puts "Trying to attach to #{current_pid}"
+        debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
+        puts debugger.dq_all.join
+        begin
+            @word.deliver data
+            status="SUCCESS"
+        rescue
+            # check AV status
+            if debugger.crash?
+                status="CRASH"
+                File.open(File.join(@config["WORK DIR"],msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
+            else
+                status="FAIL"
+            end
+        end
+        # close the debugger and kill the app
+        debugger.close
+        @word=nil
+        sleep(5)
+        status
+    end
+=begin
     def deliver(data,msg_id)
         status=false
         begin
@@ -152,7 +192,7 @@ module FuzzClient
         @word=nil
         status
     end
-
+=end
     def post_init
         @handler=NetStringTokenizer.new
         @sent=0
@@ -194,8 +234,8 @@ module FuzzClient
                 @template=msg.data
                 # Sending multiple ready messages here should kick in the thread pool
                 2.times do 
-                  send_client_ready
-                  end
+                    send_client_ready
+                end
             else
                 raise RuntimeError, "Unknown Command!"
             end

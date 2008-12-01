@@ -80,7 +80,20 @@ module CONN_CDB
         @generate_ctrl_event.call(1,@child_pid)
     end
 
+    def target_running?
+        state=qc_all.join
+        state[-1]!=' '
+    end
+
+    def crash?
+        state=qc_all.join
+        state=~/second chance/
+    end
+
+    # Because this method is a point in time capture of the registers we flush
+    # the queue.
     def registers
+        send_break if target_running?
         sr "r\n"
         regstring=''
         # Potential infinite loop here :(
