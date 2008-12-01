@@ -78,11 +78,14 @@ module CONN_CDB
 
     def send_break
         @generate_ctrl_event.call(1,@child_pid)
+        sleep(1)
+        true
     end
 
     def target_running?
         state=qc_all.join
-        state[-1]!=' '
+        return false if state[-1]==32
+        true
     end
 
     def crash?
