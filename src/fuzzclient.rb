@@ -4,6 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'connector'
 require 'conn_office'
+require 'conn_cdb'
 require 'diff/lcs'
 
 
