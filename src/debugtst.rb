@@ -4,4 +4,5 @@ require 'conn_cdb'
 debugger=Connector.new(CONN_CDB,"notepad.exe")
 p debugger.registers
 p debugger.registers.eax
+p debugger.check_crash
 debugger.close

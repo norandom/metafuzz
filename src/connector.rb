@@ -44,22 +44,13 @@ class Connector
     #Thread.abort_on_exception=true
 
     @recv_thread=Thread.new do
-      loop do
-        begin
-          item = blocking_read 
-        rescue
-          reconnect # some proto_modules will retry here, so Connector doesn't.
-          begin
-            item = blocking_read 
-          rescue
-            raise RuntimeError, "Read thread failed."
-          end
-        end
+while !(item=blocking_read).empty?
         @queue_mutex.synchronize { 
           @queue << item #LILO
           @queue.shift if @queue.length > QUEUE_MAXLEN # drop oldest item
-        } unless item.nil?
+        }
       end
+
     end
 
   end
@@ -147,7 +138,7 @@ class Connector
     # If the user doesn't call this they will leak memory, because the receive
     # thread will hang around... so yeah, call close. :)
     @recv_thread.kill
-    destroy_connection if connected?
+    destroy_connection
   end
 
   #Returns a boolean.

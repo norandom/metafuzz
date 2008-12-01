@@ -80,11 +80,9 @@ begin
         word_instances.each {|pid,kill_level|
             if kill_level > 8
                 Process.kill(9,pid)
-                delete_temp_files
                 print "<!#{pid}!>";$stdout.flush
             elsif kill_level > 1 # seen before, try and kill
                 Process.kill(1,pid)
-                delete_temp_files
                 print "<#{pid}>";$stdout.flush
                 word_instances[pid]=9
             end
@@ -92,6 +90,7 @@ begin
 
         print '*';$stdout.flush
         sleep(5)
+        delete_temp_files
     end
 rescue
     puts "Wordslayer: PK: #{$!}"

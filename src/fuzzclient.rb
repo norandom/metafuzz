@@ -113,6 +113,7 @@ module FuzzClient
 
 
     def deliver(data,msg_id)
+        begin
         status="ERROR"
         @data=data
         begin
@@ -135,9 +136,10 @@ module FuzzClient
             print '.';$stdout.flush
         rescue
             # check AV status
-            if debugger.crash?
-                status="CRASH"
-                File.open(File.join(@config["WORK DIR"],msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
+            sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
+            if (debugger.dq_all.join rescue nil) =~/second chance/
+              status="CRASH"
+                File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
                 print '!';$stdout.flush
             else
                 status="FAIL"
@@ -148,8 +150,10 @@ module FuzzClient
         @word.close rescue nil
         debugger.close
         @word=nil
-        sleep(5)
         status
+        rescue
+        raise RuntimeError, "Delivery: fuck this. #{$!}"
+        end
     end
 =begin
     def deliver(data,msg_id)
@@ -211,7 +215,6 @@ module FuzzClient
             when "DELIVER"
                 #fuzzfile=Diff::LCS.patch(@template,msg.data)
                 fuzzfile=msg.data
-                send_to_word=proc do
                     begin
                         status=deliver(fuzzfile,msg.id)
                     rescue
@@ -220,13 +223,8 @@ module FuzzClient
                         EventMachine::stop_event_loop
                         raise RuntimeError, "Something is fucked. Dying #{$!}"
                     end
-                    "#{msg.id}:#{status}"
-                end
-                callback=proc do |result|
-                    send_result result
+                    send_result "#{msg.id}:#{status}"
                     send_client_ready
-                end
-                EM.defer(send_to_word,callback)
             when "SERVER FINISHED"
                 puts "FuzzClient: Server is finished."
                 send_client_shutdown
