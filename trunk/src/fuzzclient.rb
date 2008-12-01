@@ -145,7 +145,7 @@ module FuzzClient
             end
         end
         # close the debugger and kill the app
-        @word.close
+        @word.close rescue nil
         debugger.close
         @word=nil
         sleep(5)
