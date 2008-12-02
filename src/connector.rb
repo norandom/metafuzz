@@ -50,7 +50,6 @@ class Connector
                     @queue.shift if @queue.length > QUEUE_MAXLEN # drop oldest item
                 }
             end
-
         end
 
     end
@@ -137,7 +136,7 @@ class Connector
     def close
         # If the user doesn't call this they will leak memory, because the receive
         # thread will hang around... so yeah, call close. :)
-        @recv_thread.kill
+        @recv_thread.kill rescue nil
         destroy_connection
     end
 
