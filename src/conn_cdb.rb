@@ -57,6 +57,7 @@ module CONN_CDB
     def destroy_connection
         #kill the CDB process
         Process.kill(9,@child_pid) rescue nil
+        @debugger=nil
     end
 
     # Sugar from here on.

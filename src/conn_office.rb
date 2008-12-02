@@ -37,7 +37,7 @@ module CONN_OFFICE
     end
     private :pid_from_app
     attr_reader :pid,:wid
-    
+
     #Open the application via OLE	
     def establish_connection
         @appname = @module_args[0]
@@ -94,11 +94,11 @@ module CONN_OFFICE
         begin
             sleep(0.1) while dialog_boxes
             begin
-              @app.Quit if @app
+                @app.Quit if @app
             rescue
-              unless Process.kill(1,@pid).include?(@pid)
-                loop until Process.kill(9,@pid).include(@pid)
-              end
+                unless Process.kill(1,@pid).include?(@pid)
+                    loop until Process.kill(9,@pid).include(@pid)
+                end
             end
             @app.ole_free rescue nil
         ensure
