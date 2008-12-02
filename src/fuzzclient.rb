@@ -118,6 +118,7 @@ module FuzzClient
         filename=File.join(@config["WORK DIR"],filename)
         fso=WIN32OLE.new("Scripting.FileSystemObject")
         path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
+        fso.ole_free
         File.open(path, "wb+") {|io| io.write data}
         path
         rescue
@@ -175,9 +176,9 @@ module FuzzClient
             end
             # close the debugger and kill the app
             # This should kill the winword process as well
-            debugger.close 
             # Clean up the connection object
             @word.close rescue nil
+            debugger.close 
             clean_up(this_test_filename) 
             status
         rescue
