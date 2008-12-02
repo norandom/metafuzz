@@ -22,17 +22,6 @@ module CONN_CDB
     #Errors should be handled at the Module level (ie here), since Connector
     #just assumes everything is going to plan.
 
-    def get_process_array
-        wmi= WIN32OLE.connect("winmgmts://")
-        processes=wmi.ExecQuery("select * from win32_process")
-        ary=[]
-        processes.each {|p|
-            ary << p.ProcessId
-        }
-        ary
-    end
-
-
     #Set up a new socket.
     def establish_connection
         @command_line=@module_args[0]
@@ -61,7 +50,7 @@ module CONN_CDB
     #Return a boolen.
     def is_connected?
         # The process is alive - is that the same as connected?
-        get_process_array.include? @child_pid
+        Process.kill(0,@child_pid).include?(@child_pid)
     end
 
     #Cleanly destroy the socket. 
