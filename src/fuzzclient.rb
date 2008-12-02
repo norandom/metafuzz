@@ -6,6 +6,7 @@ require 'connector'
 require 'conn_office'
 require 'conn_cdb'
 require 'diff/lcs'
+require 'fileutils'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
@@ -111,13 +112,27 @@ module FuzzClient
             send_data ready_msg
     end
 
+    def prepare_test_file(data, msg_id)
+        filename="test-"+msg_id.to_s+".doc"
+        filename=File.join(@config["WORK DIR"],filename)
+        fso=WIN32OLE.new("Scripting.FileSystemObject")
+        path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
+    end
+
+    def clean_up( fn )
+        begin
+            FileUtils.rm_f(fn)
+        rescue
+            raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
+        end
+    end
 
     def deliver(data,msg_id)
         begin
             status="ERROR"
-            @data=data
+            this_test_filename=prepare_test_file(data, msg_id)
             begin
-                @word=Connector.new(CONN_OFFICE, 'word', @config["WORK DIR"])
+                @word=Connector.new(CONN_OFFICE, 'word')
                 @word.connected?
                 current_pid=@word.pid
             rescue
@@ -131,7 +146,7 @@ module FuzzClient
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
             begin
-                @word.deliver data
+                @word.deliver this_test_filename
                 status="SUCCESS"
                 print '.';$stdout.flush
             rescue
@@ -139,7 +154,7 @@ module FuzzClient
                 sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
                     status="CRASH"
-                    File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
+                    File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                 else
                     status="FAIL"
@@ -147,8 +162,11 @@ module FuzzClient
                 end
             end
             # close the debugger and kill the app
+            # This should kill the winword process as well
+            debugger.close 
+            # Clean up the connection object
             @word.close rescue nil
-            debugger.close
+            clean_up(this_test_filename) rescue nil
             status
         rescue
             raise RuntimeError, "Delivery: fatal: #{$!}"
@@ -156,7 +174,7 @@ module FuzzClient
         end
     end
 
-   def post_init
+    def post_init
         @handler=NetStringTokenizer.new
         @sent=0
         @template=""

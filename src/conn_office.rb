@@ -37,19 +37,18 @@ module CONN_OFFICE
     end
     private :pid_from_app
     attr_reader :pid,:wid
+    
     #Open the application via OLE	
     def establish_connection
-        @appname, @path = @module_args
-        @path||=File.dirname(File.expand_path(__FILE__)) # same directory as the script is running from
-        @files=[]
+        @appname = @module_args[0]
         @wm=WindowOperations.new
         begin
             @app=WIN32OLE.new(@appname+'.Application')
-            #@app.visible=true # for now.
+            #@app.visible=true
             @pid,@wid=pid_from_app(@app)
             @app.DisplayAlerts=0
         rescue
-            destroy_connection
+            close
             raise RuntimeError, "CONN_OFFICE: establish: couldn't open application. (#{$!})"
         end
     end
@@ -61,20 +60,13 @@ module CONN_OFFICE
     end
 
     #Write a string to a file and open it in the application
-    def blocking_write( data )
+    def blocking_write( filename )
         raise RuntimeError, "CONN_OFFICE: blocking_write: Not connected!" unless is_connected?
         begin
-            filename="temp" + Time.now.hash.to_s + self.object_id.to_s + ".doc"
-            filename=File.join(@path,filename)
-            fso=WIN32OLE.new("Scripting.FileSystemObject")
-            path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
-            @files << path
-            File.open(path, "wb+") {|io| io.write(data)}
             # this call blocks, so if it opens a dialog box immediately we lose control of the app. 
             # This is the biggest issue, and so far can only be solved with a separate monitor app
             # that kills word processes that are hanging here.
-            @app.Documents.Open({"FileName"=>path,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
-            @app.visible
+            @app.Documents.Open({"FileName"=>filename,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
         rescue
             raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"
         end
@@ -98,14 +90,12 @@ module CONN_OFFICE
         Thread.critical=false
     end
 
-    # Attempt to cleanly destroy the app. 
+    # This is a little extreme, but @app.quit is slow and prone to throwing exceptions.
     def destroy_connection
-        @app.documents.each {|doc| doc.close rescue nil} rescue nil
         begin
-            @app.quit rescue nil
+            Process.kill(9, @pid) rescue nil
         ensure
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
-            @files.each {|fn| FileUtils.rm_f(fn) rescue nil}
         end
     end
 
