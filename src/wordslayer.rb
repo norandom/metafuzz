@@ -18,9 +18,8 @@ end
 
 def delete_temp_files
     tempfiles='C:/Documents and Settings/Administrator/Local Settings/Temporary Internet Files/Content.Word/*WR*.tmp'
-    fuzzfiles='C:/fuzzclient/*mp*.doc'
 
-    [tempfiles,fuzzfiles].each {|pattern|
+    [tempfiles].each {|pattern|
         Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
             begin
                 FileUtils.rm_f(fn)
