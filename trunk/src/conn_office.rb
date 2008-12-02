@@ -90,13 +90,20 @@ module CONN_OFFICE
         Thread.critical=false
     end
 
-    # This is a little extreme, but @app.quit is slow and prone to throwing exceptions.
     def destroy_connection
-        @app.ole_free rescue nil
         begin
-            Process.kill(9, @pid) rescue nil
+            sleep(0.1) while dialog_boxes
+            begin
+              @app.Quit if @app
+            rescue
+              unless Process.kill(1,@pid).include?(@pid)
+                loop until Process.kill(9,@pid).include(@pid)
+              end
+            end
+            @app.ole_free rescue nil
         ensure
             @app=nil
+            @wm=nil
         end
     end
 
