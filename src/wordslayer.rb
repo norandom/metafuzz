@@ -73,20 +73,12 @@ word_instances=Hash.new(0)
 begin
     wmi = WIN32OLE.connect("winmgmts://")
     loop do
-        procs=get_process_array(wmi)
-        word_instances.delete_if {|pid,kill_level| not procs.include?(pid)}
-        procs.each {|p| word_instances[p]+=1}
-        word_instances.each {|pid,kill_level|
-            if kill_level > 8
-                #Process.kill(9,pid)
-                print "<!#{pid}!>";$stdout.flush
-            elsif kill_level > 1 # seen before, try and kill
-                #Process.kill(1,pid)
-                print "<#{pid}>";$stdout.flush
-                word_instances[pid]=9
+        procs=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE'")
+        procs.each {|p|
+            if p.WorkingSetSize.to_i > 100*1024*1024 # 100MB
+                Process.kill(9, p.ProcessId)
             end
         }
-
         print '*';$stdout.flush
         sleep(5)
         delete_temp_files
