@@ -93,7 +93,7 @@ class << prod_queue
         Thread.critical=false
     end
 end
-=begin
+
 production=Thread.new do
     begin
         header,raw_fib,rest=""
@@ -110,7 +110,6 @@ production=Thread.new do
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
             prod_queue << (header+fuzzed+rest)
-
         end
         prod_queue.finish
         Thread.current.exit	
@@ -119,7 +118,7 @@ production=Thread.new do
         exit
     end
 end
-=end
+=begin
 prod_thread=Thread.new do
     begin
         puts "Production thread starting..."
@@ -145,6 +144,7 @@ prod_thread=Thread.new do
         exit
     end
 end
+=end
 class ResultTracker
     attr_accessor :clients
 
