@@ -92,10 +92,11 @@ module CONN_OFFICE
 
     # This is a little extreme, but @app.quit is slow and prone to throwing exceptions.
     def destroy_connection
+        @app.ole_free rescue nil
         begin
             Process.kill(9, @pid) rescue nil
         ensure
-            @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
+            @app=nil
         end
     end
 
