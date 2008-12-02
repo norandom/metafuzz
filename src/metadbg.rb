@@ -36,14 +36,6 @@ io.write("g\n")
 p io.pid
 io.write("r\n")
 sleep 2
-begin
-    get_process_array.each {|cdbpid|
-    puts "trying to send -3 to #{cdbpid}"
-        Process.kill(2,cdbpid)
-    }
-rescue
-    puts $!
-end
 gce.call(1,io.pid)
 io.write(".echo W0000000000000000000t\n")
 sleep(5)

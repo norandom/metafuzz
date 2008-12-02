@@ -136,7 +136,7 @@ module FuzzClient
                 print '.';$stdout.flush
             rescue
                 # check AV status
-                sleep(0.1) # The main point is that sleep will pass execution to the debugger recv thread
+                sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
                     status="CRASH"
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(@data)}
@@ -149,10 +149,10 @@ module FuzzClient
             # close the debugger and kill the app
             @word.close rescue nil
             debugger.close
-            @word=nil
             status
         rescue
-            raise RuntimeError, "Delivery: fuck this. #{$!}"
+            raise RuntimeError, "Delivery: fatal: #{$!}"
+            # ask the server to revert me to my snapshot
         end
     end
 

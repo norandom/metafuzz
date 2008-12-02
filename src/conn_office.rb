@@ -94,14 +94,15 @@ module CONN_OFFICE
         Thread.critical=true
         children=@wm.do_enum_windows {|k,v| v[:parent_window]==@wid}
         children.length > 0
-        ensure
+    ensure
         Thread.critical=false
     end
 
-    #Cleanly destroy the app. 
+    # Attempt to cleanly destroy the app. 
     def destroy_connection
+        @app.documents.each {|doc| doc.close rescue nil} rescue nil
         begin
-Process.kill(9,@pid) rescue nil
+            @app.quit rescue nil
         ensure
             @app=nil #doc says ole_free gets called during garbage collection, so this should be enough
             @files.each {|fn| FileUtils.rm_f(fn) rescue nil}

@@ -79,10 +79,10 @@ begin
         procs.each {|p| word_instances[p]+=1}
         word_instances.each {|pid,kill_level|
             if kill_level > 8
-                Process.kill(9,pid)
+                #Process.kill(9,pid)
                 print "<!#{pid}!>";$stdout.flush
             elsif kill_level > 1 # seen before, try and kill
-                Process.kill(1,pid)
+                #Process.kill(1,pid)
                 print "<#{pid}>";$stdout.flush
                 word_instances[pid]=9
             end

@@ -66,9 +66,10 @@ module CONN_CDB
 
     #Cleanly destroy the socket. 
     def destroy_connection
-      Process.kill(9,@child_pid) rescue nil
+        #kill the CDB process
+        Process.kill(9,@child_pid) rescue nil
     end
-    
+
     # Sugar from here on.
 
     #Our popen object isn't actually an IO obj, so it only has read and write.
@@ -90,7 +91,7 @@ module CONN_CDB
 
     def crash?
         qc_all.join=~/second chance/
-      end
+    end
 
 
     # Because this method is a point in time capture of the registers we flush
