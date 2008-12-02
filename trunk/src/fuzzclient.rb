@@ -113,18 +113,30 @@ module FuzzClient
     end
 
     def prepare_test_file(data, msg_id)
+        begin
         filename="test-"+msg_id.to_s+".doc"
         filename=File.join(@config["WORK DIR"],filename)
         fso=WIN32OLE.new("Scripting.FileSystemObject")
         path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
+        File.open(path, "wb+") {|io| io.write data}
+        path
+        rescue
+        raise RuntimeError, "Fuzzclient: Couldn't create test file #{fn} : #{$!}"
+        end
     end
 
     def clean_up( fn )
+        10.times do
         begin
             FileUtils.rm_f(fn)
+            FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
         rescue
             raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
+          end
+          return true unless File.exist? fn
+          sleep(0.1)
         end
+        return false
     end
 
     def deliver(data,msg_id)
@@ -166,7 +178,7 @@ module FuzzClient
             debugger.close 
             # Clean up the connection object
             @word.close rescue nil
-            clean_up(this_test_filename) rescue nil
+            clean_up(this_test_filename) 
             status
         rescue
             raise RuntimeError, "Delivery: fatal: #{$!}"
