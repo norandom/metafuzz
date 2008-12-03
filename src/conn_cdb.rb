@@ -28,7 +28,7 @@ module CONN_CDB
         @generate_ctrl_event = Win32API.new("kernel32", "GenerateConsoleCtrlEvent", ['I','I'], 'I')
         begin
             @debugger=WindowsPipe.popen(CDB_PATH+@command_line)
-            @child_pid=@debugger.pid
+            @cdb_pid=@debugger.pid
             # Discard the startup blurb
             sleep 0.1 until @debugger.dq_all.join.length > 0
         rescue
@@ -50,14 +50,14 @@ module CONN_CDB
     #Return a boolen.
     def is_connected?
         # The process is alive - is that the same as connected?
-        Process.kill(0,@child_pid).include?(@child_pid)
+        Process.kill(0,@cdb_pid).include?(@cdb_pid)
     end
 
     #Cleanly destroy the socket. 
     def destroy_connection
         #kill the CDB process
-        Process.kill(9,@child_pid) rescue nil
-        @debugger=nil
+        Process.kill(9,@cdb_pid) rescue nil
+        @debugger.close
     end
 
     # Sugar from here on.
@@ -68,7 +68,7 @@ module CONN_CDB
     end
 
     def send_break
-        @generate_ctrl_event.call(1,@child_pid)
+        @generate_ctrl_event.call(1,@cdb_pid)
         sleep(1)
         true
     end
