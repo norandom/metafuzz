@@ -145,8 +145,14 @@ module FuzzClient
             status="ERROR"
             this_test_filename=prepare_test_file(data, msg_id)
             begin
-                @word=Connector.new(CONN_OFFICE, 'word')
-                @word.connected?
+                5.times do
+                begin
+                    @word=Connector.new(CONN_OFFICE, 'word')
+                    break
+                rescue
+                    sleep(1)
+                    retry
+                end
                 current_pid=@word.pid
             rescue
                 raise RuntimeError, "Couldn't establish connection to app. #{$!}"

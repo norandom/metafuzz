@@ -137,6 +137,7 @@ class Connector
         # If the user doesn't call this they will leak memory, because the receive
         # thread will hang around... so yeah, call close. :)
         @recv_thread.kill rescue nil
+        @queue_mutex=nil
         destroy_connection
     end
 

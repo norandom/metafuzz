@@ -1,4 +1,4 @@
-# Stolen from Simon Kroger, comp.lang.ruby post Sep 12, 2005.
+# Mostly stolen from Simon Kroger, comp.lang.ruby post Sep 12, 2005.
 
 module WindowsPipe
     require 'Win32API' 
@@ -176,9 +176,10 @@ module WindowsPipe
         #                                     command, child_in_r, child_out_w, child_error_w) 
         processId, threadId = create_process(command, child_in_r, child_out_w, child_error_w) 
         # we have to close the handles, so the pipes terminate with the process 
+        # the original code didn't close ALL the handles, so it leaked pipes :(
         close_handle(child_in_r) 
         close_handle(child_out_w) 
-        close_handle(child_error_w) 
+        close_handle(child_error_w) # Why are these never used?? 
         close_handle(child_error_r) 
         Win32popenIO.new(child_out_r, child_in_w, processId) 
     end 
