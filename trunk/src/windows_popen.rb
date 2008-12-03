@@ -157,6 +157,10 @@ module WindowsPipe
             end 
             all 
         end 
+        def close
+            close_handle(@hRead)
+            close_handle(@hWrite)
+        end
     end 
     module_function
     def popen(command) 
@@ -175,6 +179,7 @@ module WindowsPipe
         close_handle(child_in_r) 
         close_handle(child_out_w) 
         close_handle(child_error_w) 
+        close_handle(child_error_r) 
         Win32popenIO.new(child_out_r, child_in_w, processId) 
     end 
 end # module WindowsPipe
