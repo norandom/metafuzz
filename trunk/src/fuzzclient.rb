@@ -7,6 +7,7 @@ require 'conn_office'
 require 'conn_cdb'
 require 'diff/lcs'
 require 'fileutils'
+require 'win32/registry'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
@@ -61,6 +62,10 @@ at_exit {
     end
     print "Done. Exiting.\n"
 }
+Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
+    reg.delete_key "StartupItems" rescue nil
+    reg.delete_key "DisabledItems" rescue nil
+end
 
 
 module FuzzClient
