@@ -5,12 +5,13 @@ BMCLICK=0x00F5
 WM_DESTROY=0x0010
 
 def kill_dialog_boxes
-
+    closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I'
     wm=WindowOperations.new
     my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
     my_result.each {|word_hwnd,child|
         children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
         child[:children]=children
+        close_handle.call word_hwnd
     }
     # my_result is now Word windows with their toplevel children
     my_result.each {|k,v|
@@ -25,6 +26,7 @@ def kill_dialog_boxes
                         wm.send_window_message(k, BMCLICK)
                     }
                 end
+                close_handle.call k
             }
         end
     }
