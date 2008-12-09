@@ -21,7 +21,6 @@ class WindowOperations
     end
 
     def close
-        User32=nil
         @enum_windows = nil
         @get_class_name = nil
         @get_caption_length = nil
