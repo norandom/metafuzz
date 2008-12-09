@@ -56,6 +56,7 @@ def kill_dialog_boxes
             }
         end
     }
+    wm=nil
 end
 
 dialog_killer=Thread.new do
