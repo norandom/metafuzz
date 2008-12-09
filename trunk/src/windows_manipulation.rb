@@ -7,6 +7,7 @@ class WindowOperations
     BMCLICK=0x00F5
     WM_DESTROY=0x0010
     User32=DL.dlopen("user32")
+    Kernel32 = DL.dlopen("kernel32")
 
     def initialize
         @enum_windows = User32['EnumWindows', 'IPL']
@@ -16,7 +17,7 @@ class WindowOperations
         @get_parent_window=User32['GetParent','II']
         @enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
         @switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-        @classname_buffer=' '*32 # class names are limited to 32 bytes
+        @close_handle = Kernel32['CloseHandle', 'IL']
     end
 
     def switch_to_window(hwnd)
@@ -29,8 +30,9 @@ class WindowOperations
 
         blk||=proc do true end
         results={}
-        @enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
-            r,rs = @get_class_name.call(hwnd, @classname_buffer, @classname_buffer.size)
+        enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
+            classname_buffer=' '*32 # limit the classname to 32 bytes
+            r,rs = @get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
             classname=rs[1].to_s
             textLength, a = @get_caption_length.call(hwnd)
             captionBuffer = " " * (textLength+1)
@@ -38,9 +40,10 @@ class WindowOperations
             caption=String(textCaption[1].to_s)
             results[hwnd]={:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption=nil
+            @close_handle.call(hwnd)
             -1
         }
-        r=@enum_child_windows.call(hwnd, @enum_child_windows_proc,0)
+        r=@enum_child_windows.call(hwnd, enum_child_windows_proc,0)
         DL.remove_callback(@enum_child_windows_proc)
         results.each {|k,v|
             children=do_child_windows(k, &blk)
@@ -52,8 +55,9 @@ class WindowOperations
     def do_enum_windows(&blk)
         blk||=proc do true end
         results={}
-        @enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
-            r,rs = @get_class_name.call(hwnd, @classname_buffer, @classname_buffer.size)
+        enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
+            classname_buffer=' '*32 # limit the classname to 32 bytes
+            r,rs = @get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
             classname=rs[1].to_s
             textLength, a = @get_caption_length.call(hwnd)
             captionBuffer = " " * (textLength+1) # allow for null termination
@@ -62,10 +66,11 @@ class WindowOperations
             parentwindow,unknown_var=@get_parent_window.call(hwnd)
             results[hwnd]={:parent_window=>parentwindow,:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption,parentwindow,unknown_var=nil
+            @close_handle.call(hwnd)
             -1 # -1 says keep going. Forget which constant it is.
         }
         r,rs=@enum_windows.call(@enum_windows_proc,0)
-        DL.remove_callback(@enum_windows_proc)
+        DL.remove_callback(enum_windows_proc)
         results.select &blk
     end
 

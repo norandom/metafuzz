@@ -3,9 +3,12 @@ require 'win32ole'
 require 'fileutils'
 require 'windows_manipulation'
 require 'pp'
+require 'DL'
 
 BMCLICK=0x00F5
 WM_DESTROY=0x0010
+Kernel32 = DL.dlopen("kernel32")
+CloseHandle = Kernel32['CloseHandle', 'IL']
 
 def get_process_array(wmi)
     processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
@@ -13,6 +16,7 @@ def get_process_array(wmi)
     processes.each {|p|
         ary << p.ProcessId
     }
+    processes=nil
     ary
 end
 
@@ -55,6 +59,13 @@ def kill_dialog_boxes
                 end
             }
         end
+    }
+    my_result.each {|handle,v|
+        if v[:children]
+            v[:children].each {|child_handle,v|
+                CloseHandle.call child_handle
+            }
+            CloseHandle.call handle
     }
     wm=nil
 end
