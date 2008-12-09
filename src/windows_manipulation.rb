@@ -37,6 +37,7 @@ class WindowOperations
             t , textCaption  = @get_caption.call(hwnd, captionBuffer  , textLength+1)    
             caption=String(textCaption[1].to_s)
             results[hwnd]={:classname=>classname,:caption=>caption}
+            r,rs,a,t,textCaption=nil
             -1
         }
         r=@enum_child_windows.call(hwnd, @enum_child_windows_proc,0)
@@ -60,6 +61,7 @@ class WindowOperations
             caption=textCaption[1].to_s
             parentwindow,unknown_var=@get_parent_window.call(hwnd)
             results[hwnd]={:parent_window=>parentwindow,:classname=>classname,:caption=>caption}
+            r,rs,a,t,textCaption,parentwindow,unknown_var=nil
             -1 # -1 says keep going. Forget which constant it is.
         }
         r,rs=@enum_windows.call(@enum_windows_proc,0)
