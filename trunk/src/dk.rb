@@ -34,21 +34,18 @@ def kill_dialog_boxes
             v[:children].each {|child_handle,v|
                 closeHandle.call child_handle
             }
-            end
-            closeHandle.call handle
+        end
+        closeHandle.call handle
     }
     wm=nil
 end
 
 
-    loop do 
-        begin
-
-            kill_dialog_boxes
-        rescue 
-            puts "Wordslayer: DK: #{$!}"
-        ensure
-
-        end
-        sleep(0.5)
+loop do 
+    begin
+        kill_dialog_boxes
+    rescue 
+        puts "Wordslayer: DK: #{$!}"
     end
+    sleep(0.5)
+end

@@ -20,6 +20,18 @@ class WindowOperations
         @closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
     end
 
+    def close
+        User32=nil
+        @enum_windows = nil
+        @get_class_name = nil
+        @get_caption_length = nil
+        @get_caption = nil
+        @get_parent_window=nil
+        @enum_child_windows = nil
+        @switch_to_window = nil
+        @closeHandle = nil
+    end
+
     def switch_to_window(hwnd)
         @switch_to_window.call(hwnd,1)
     end
@@ -27,7 +39,7 @@ class WindowOperations
     def do_child_windows(hwnd, &blk)
         #This doesn't do what I expect, in that if you call enum_windows and look for windows that
         # have parent x, the results are different to calling enum_child_windows(hwnd(x))
-    
+
         blk||=proc do true end
         results={}
         enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
@@ -49,12 +61,14 @@ class WindowOperations
             children=do_child_windows(k, &blk)
             v[:children]=children unless children.empty?
         }
-        results.each {|handle,val|
-          unless blk.call(handle,val)
-            @closeHandle.call handle
-          end
-          }
-        results.select &blk
+        filtered=results.select &blk
+        results.each {|hwnd,v|
+            v[:children].each {|child_hwnd,v|
+                @closeHandle.call child_hwnd
+            } rescue nil
+            @closeHandle.call hwnd
+        }
+        filtered
     end
 
     def do_enum_windows(&blk)
@@ -77,11 +91,15 @@ class WindowOperations
         r,rs=@enum_windows.call(enum_windows_proc,0)
         DL.remove_callback(enum_windows_proc)
         results.each {|handle,val|
-          unless blk.call(handle,val)
-            @closeHandle.call handle
-          end
-          }
-        results.select &blk
+            unless blk.call(handle,val)
+                @closeHandle.call handle
+            end
+        }
+        filtered=results.select &blk
+        results.each {|hwnd,v|
+            @closeHandle.call hwnd
+        }
+        filtered
     end
 
     def send_window_message(hwnd, message)
