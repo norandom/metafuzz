@@ -11,8 +11,11 @@ class WindowOperations
 
     def switch_to_window(hwnd)
         switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
         switch_to_window.call(hwnd,1)
+        closeHandle.call hwnd
         switch_to_window=nil
+        closeHandle=nil
     end
 
     def do_child_windows(hwnd, &blk)
@@ -39,6 +42,7 @@ class WindowOperations
             caption=String(textCaption[1].to_s)
             results[hwnd]={:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption=nil
+            closeHandle.call hwnd
             -1
         }
         r=enum_child_windows.call(hwnd, enum_child_windows_proc,0)
@@ -97,9 +101,12 @@ class WindowOperations
     end
 
     def send_window_message(hwnd, message)
+        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
         post_message = User32['PostMessage', 'ILILL']
         r,rs=post_message.call(hwnd,message,0,0)
+        closeHandle.call hwnd
         post_message=nil
+        closeHandle=nil
     end
 
 end #module WindowOperations
