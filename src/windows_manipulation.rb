@@ -30,31 +30,23 @@ class WindowOperations
         results={}
         enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
             classname_buffer=' '*32 # limit the classname to 32 bytes
-            r,rs = @get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
+            r,rs = get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
             classname=rs[1].to_s
-            textLength, a = @get_caption_length.call(hwnd)
+            textLength, a = get_caption_length.call(hwnd)
             captionBuffer = " " * (textLength+1)
-            t , textCaption  = @get_caption.call(hwnd, captionBuffer  , textLength+1)    
+            t , textCaption  = get_caption.call(hwnd, captionBuffer  , textLength+1)    
             caption=String(textCaption[1].to_s)
             results[hwnd]={:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption=nil
-            @closeHandle.call hwnd
             -1
         }
-        r=@enum_child_windows.call(hwnd, enum_child_windows_proc,0)
+        r=enum_child_windows.call(hwnd, enum_child_windows_proc,0)
         DL.remove_callback(enum_child_windows_proc)
         results.each {|k,v|
             children=do_child_windows(k, &blk)
             v[:children]=children unless children.empty?
         }
-        filtered=results.select &blk
-        results.each {|hwnd,v|
-            v[:children].each {|child_hwnd,v|
-                @closeHandle.call child_hwnd
-            } rescue nil
-            @closeHandle.call hwnd
-        }
-        filtered
+        results.select &blk
     end
 
     def do_enum_windows(&blk)
@@ -70,30 +62,21 @@ class WindowOperations
         results={}
         enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
             classname_buffer=' '*32 # limit the classname to 32 bytes
-            r,rs = @get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
+            r,rs = get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
             classname=rs[1].to_s
-            textLength, a = @get_caption_length.call(hwnd)
+            textLength, a = get_caption_length.call(hwnd)
             captionBuffer = " " * (textLength+1) # allow for null termination
-            t , textCaption  = @get_caption.call(hwnd, captionBuffer, captionBuffer.length)    
+            t , textCaption  = get_caption.call(hwnd, captionBuffer, captionBuffer.length)    
             caption=textCaption[1].to_s
-            parentwindow,unknown_var=@get_parent_window.call(hwnd)
+            parentwindow,unknown_var=get_parent_window.call(hwnd)
             results[hwnd]={:parent_window=>parentwindow,:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption,parentwindow,unknown_var=nil
-            @closeHandle.call hwnd
+            closeHandle.call hwnd
             -1 # -1 says keep going. Forget which constant it is.
         }
-        r,rs=@enum_windows.call(enum_windows_proc,0)
+        r,rs=enum_windows.call(enum_windows_proc,0)
         DL.remove_callback(enum_windows_proc)
-        results.each {|handle,val|
-            unless blk.call(handle,val)
-                @closeHandle.call handle
-            end
-        }
-        filtered=results.select &blk
-        results.each {|hwnd,v|
-            @closeHandle.call hwnd
-        }
-        filtered
+        results.select &blk
     end
 
     def send_window_message(hwnd, message)
