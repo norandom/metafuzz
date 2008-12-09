@@ -7,7 +7,6 @@ WM_DESTROY=0x0010
 def kill_dialog_boxes
 
     wm=WindowOperations.new
-    closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
     my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
     my_result.each {|word_hwnd,child|
         children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
@@ -28,14 +27,6 @@ def kill_dialog_boxes
                 end
             }
         end
-    }
-    my_result.each {|handle,v|
-        if v[:children]
-            v[:children].each {|child_handle,v|
-                closeHandle.call child_handle
-            }
-        end
-        closeHandle.call handle
     }
     my_result=nil
     wm=nil
