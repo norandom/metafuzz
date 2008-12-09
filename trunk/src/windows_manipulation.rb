@@ -12,6 +12,7 @@ class WindowOperations
     def switch_to_window(hwnd)
         switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
         switch_to_window.call(hwnd,1)
+        switch_to_window=nil
     end
 
     def do_child_windows(hwnd, &blk)
@@ -46,6 +47,14 @@ class WindowOperations
             children=do_child_windows(k, &blk)
             v[:children]=children unless children.empty?
         }
+        enum_windows =nil
+        get_class_name =nil
+        get_caption_length =nil
+        get_caption =nil
+        get_parent_window=nil
+        enum_child_windows =nil
+        switch_to_window =nil
+        closeHandle =nil
         results.select &blk
     end
 
@@ -76,12 +85,21 @@ class WindowOperations
         }
         r,rs=enum_windows.call(enum_windows_proc,0)
         DL.remove_callback(enum_windows_proc)
+        enum_windows =nil
+        get_class_name =nil
+        get_caption_length =nil
+        get_caption =nil
+        get_parent_window=nil
+        enum_child_windows =nil
+        switch_to_window =nil
+        closeHandle =nil
         results.select &blk
     end
 
     def send_window_message(hwnd, message)
         post_message = User32['PostMessage', 'ILILL']
         r,rs=post_message.call(hwnd,message,0,0)
+        post_message=nil
     end
 
 end #module WindowOperations
