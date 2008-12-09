@@ -3,11 +3,11 @@ require 'pp'
 class WindowOperations
 
     require 'dl'
+    require 'Win32API'
 
     BMCLICK=0x00F5
     WM_DESTROY=0x0010
     User32=DL.dlopen("user32")
-    Kernel32 = DL.dlopen("kernel32")
 
     def initialize
         @enum_windows = User32['EnumWindows', 'IPL']
@@ -17,7 +17,7 @@ class WindowOperations
         @get_parent_window=User32['GetParent','II']
         @enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
         @switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-        @close_handle = Kernel32['CloseHandle', 'IL']
+        @closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
     end
 
     def switch_to_window(hwnd)
@@ -27,7 +27,7 @@ class WindowOperations
     def do_child_windows(hwnd, &blk)
         #This doesn't do what I expect, in that if you call enum_windows and look for windows that
         # have parent x, the results are different to calling enum_child_windows(hwnd(x))
-
+    
         blk||=proc do true end
         results={}
         enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
@@ -40,15 +40,20 @@ class WindowOperations
             caption=String(textCaption[1].to_s)
             results[hwnd]={:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption=nil
-            @close_handle.call(hwnd)
+            @closeHandle.call hwnd
             -1
         }
         r=@enum_child_windows.call(hwnd, enum_child_windows_proc,0)
-        DL.remove_callback(@enum_child_windows_proc)
+        DL.remove_callback(enum_child_windows_proc)
         results.each {|k,v|
             children=do_child_windows(k, &blk)
             v[:children]=children unless children.empty?
         }
+        results.each {|handle,val|
+          unless blk.call(handle,val)
+            @closeHandle.call handle
+          end
+          }
         results.select &blk
     end
 
@@ -66,11 +71,16 @@ class WindowOperations
             parentwindow,unknown_var=@get_parent_window.call(hwnd)
             results[hwnd]={:parent_window=>parentwindow,:classname=>classname,:caption=>caption}
             r,rs,a,t,textCaption,parentwindow,unknown_var=nil
-            @close_handle.call(hwnd)
+            @closeHandle.call hwnd
             -1 # -1 says keep going. Forget which constant it is.
         }
-        r,rs=@enum_windows.call(@enum_windows_proc,0)
+        r,rs=@enum_windows.call(enum_windows_proc,0)
         DL.remove_callback(enum_windows_proc)
+        results.each {|handle,val|
+          unless blk.call(handle,val)
+            @closeHandle.call handle
+          end
+          }
         results.select &blk
     end
 
