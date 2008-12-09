@@ -18,8 +18,9 @@ end
 
 def delete_temp_files
     tempfiles='C:/Documents and Settings/Administrator/Local Settings/Temporary Internet Files/Content.Word/*WR*.tmp'
+    fuzzfiles='C:/fuzzclient/~$*.doc'
 
-    [tempfiles].each {|pattern|
+    [tempfiles,fuzzfiles].each {|pattern|
         Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
             begin
                 FileUtils.rm_f(fn)
@@ -60,9 +61,12 @@ dialog_killer=Thread.new do
     wm=WindowOperations.new
     loop do 
         begin
+            Thread.critical=true
             kill_dialog_boxes(wm)
         rescue 
             puts "Wordslayer: DK: #{$!}"
+        ensure
+            Thread.critical=false
         end
         sleep(0.5)
     end

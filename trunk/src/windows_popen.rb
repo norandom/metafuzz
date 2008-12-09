@@ -163,7 +163,7 @@ module WindowsPipe
         end
     end 
     module_function
-    def popen(command) 
+    def popen(command, wrap_in_shell=false) 
         # create 3 pipes 
         child_in_r, child_in_w = create_pipe 
         child_out_r, child_out_w = create_pipe 
@@ -172,9 +172,12 @@ module WindowsPipe
         set_handle_information(child_in_w, HANDLE_FLAG_INHERIT, 0) 
         set_handle_information(child_out_r, HANDLE_FLAG_INHERIT, 0) 
         set_handle_information(child_error_r, HANDLE_FLAG_INHERIT, 0) 
-        #processId, threadId = create_process(ENV['ComSpec'] + ' /C ' + 
-        #                                     command, child_in_r, child_out_w, child_error_w) 
-        processId, threadId = create_process(command, child_in_r, child_out_w, child_error_w) 
+        if wrap_in_shell
+            processId, threadId = create_process(ENV['ComSpec'] + ' /C ' + 
+                                                 command, child_in_r, child_out_w, child_error_w) 
+        else
+            processId, threadId = create_process(command, child_in_r, child_out_w, child_error_w) 
+        end
         # we have to close the handles, so the pipes terminate with the process 
         # the original code didn't close ALL the handles, so it leaked pipes :(
         close_handle(child_in_r) 
@@ -185,7 +188,7 @@ module WindowsPipe
     end 
 end # module WindowsPipe
 if $0 == __FILE__ 
-    io = WindowsPipe.popen('ver') 
+    io = WindowsPipe.popen('ver',true) 
     puts io.read_all 
     io = WindowsPipe.popen('cmd') 
     io.write("ping localhost\nexit\n") 

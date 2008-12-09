@@ -105,7 +105,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,16,8)
+        g=Generators::RollingCorrupt.new(raw_fib,64,64)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -146,7 +146,6 @@ prod_thread=Thread.new do
 end
 =end
 class ResultTracker
-    attr_accessor :clients
 
     def initialize
         @sent=0
@@ -155,6 +154,20 @@ class ResultTracker
         @results={}
         @time_mark=Time.now
         @sent_mark=0
+    end
+
+    def add_client
+        Thread.critical
+        @clients+=1
+    ensure
+        Thread.critical=false
+    end
+
+    def remove_client
+        Thread.critical
+        @clients+=1
+    ensure
+        Thread.critical=false
     end
 
     def increment_sent
@@ -209,7 +222,6 @@ module FuzzServer
         @template=@production_queue.template
         @result_tracker=rt
         @handler=NetStringTokenizer.new
-        @result_tracker.clients=0
         EM.add_periodic_timer(30) {@result_tracker.spit_results}
         at_exit {@result_tracker.spit_results}
     end
@@ -260,11 +272,11 @@ module FuzzServer
 
     def handle_client_startup
         send_data @handler.pack(FuzzMessage.new({:verb=>"TEMPLATE",:data=>@template}).to_yaml)
-        @result_tracker.clients+=1
+        @result_tracker.add_client
     end
 
     def handle_client_shutdown
-        @result_tracker.clients-=1
+        @result_tracker.remove_client
         if @production_queue.empty? and @production_queue.finished? and @result_tracker.clients <=0
             puts "All done, shutting down."
             EventMachine::stop_event_loop
