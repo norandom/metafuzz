@@ -5,7 +5,7 @@ BMCLICK=0x00F5
 WM_DESTROY=0x0010
 
 def kill_dialog_boxes
-    closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I'
+    closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
     wm=WindowOperations.new
     my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
     my_result.each {|word_hwnd,child|
