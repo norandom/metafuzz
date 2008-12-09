@@ -38,7 +38,6 @@ def kill_dialog_boxes
         closeHandle.call handle
     }
     my_result=nil
-    wm.close
     wm=nil
 end
 

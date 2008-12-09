@@ -9,36 +9,23 @@ class WindowOperations
     WM_DESTROY=0x0010
     User32=DL.dlopen("user32")
 
-    def initialize
-        @enum_windows = User32['EnumWindows', 'IPL']
-        @get_class_name = User32['GetClassName', 'ILpI']
-        @get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
-        @get_caption = User32['GetWindowTextA', 'iLsL' ]
-        @get_parent_window=User32['GetParent','II']
-        @enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
-        @switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-        @closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
-    end
-
-    def close
-        @enum_windows = nil
-        @get_class_name = nil
-        @get_caption_length = nil
-        @get_caption = nil
-        @get_parent_window=nil
-        @enum_child_windows = nil
-        @switch_to_window = nil
-        @closeHandle = nil
-    end
-
     def switch_to_window(hwnd)
-        @switch_to_window.call(hwnd,1)
+        switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+        switch_to_window.call(hwnd,1)
     end
 
     def do_child_windows(hwnd, &blk)
         #This doesn't do what I expect, in that if you call enum_windows and look for windows that
         # have parent x, the results are different to calling enum_child_windows(hwnd(x))
 
+        enum_windows = User32['EnumWindows', 'IPL']
+        get_class_name = User32['GetClassName', 'ILpI']
+        get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
+        get_caption = User32['GetWindowTextA', 'iLsL' ]
+        get_parent_window=User32['GetParent','II']
+        enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
+        switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
         blk||=proc do true end
         results={}
         enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
@@ -71,6 +58,14 @@ class WindowOperations
     end
 
     def do_enum_windows(&blk)
+        enum_windows = User32['EnumWindows', 'IPL']
+        get_class_name = User32['GetClassName', 'ILpI']
+        get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
+        get_caption = User32['GetWindowTextA', 'iLsL' ]
+        get_parent_window=User32['GetParent','II']
+        enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
+        switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
         blk||=proc do true end
         results={}
         enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
