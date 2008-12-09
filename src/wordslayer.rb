@@ -32,8 +32,9 @@ def delete_temp_files
     }
 end
 
-def kill_dialog_boxes(wm)
+def kill_dialog_boxes
 
+    wm=WindowOperations.new
     my_result=wm.do_enum_windows {|k,v| v[:classname] =~ /OpusApp/}
     my_result.each {|word_hwnd,child|
         children=wm.do_enum_windows {|k,v| v[:parent_window]==word_hwnd}
@@ -58,11 +59,10 @@ def kill_dialog_boxes(wm)
 end
 
 dialog_killer=Thread.new do
-    wm=WindowOperations.new
     loop do 
         begin
             Thread.critical=true
-            kill_dialog_boxes(wm)
+            kill_dialog_boxes
         rescue 
             puts "Wordslayer: DK: #{$!}"
         ensure
