@@ -16,7 +16,7 @@ PostMessage=Win32API.new("user32.dll", "PostMessage", 'LILL','I')
 
 def kill_dialog_boxes
     word_hwnd=FindWindow.call("OpusApp",0)
-    child_hwndg=GetWindow.call(word_hwnd, GW_ENABLEDPOPUP)
+    child_hwnd=GetWindow.call(word_hwnd, GW_ENABLEDPOPUP)
     unless child_hwnd==0
         PostMessage.call(child_hwnd,WM_COMMAND,IDCANCEL,0)
         PostMessage.call(child_hwnd,WM_COMMAND,IDNO,0)
