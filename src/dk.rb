@@ -1,4 +1,3 @@
-require 'windows_manipulation'
 require 'Win32API'
 
 BMCLICK=0x00F5
