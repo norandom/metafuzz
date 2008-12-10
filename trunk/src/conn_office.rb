@@ -80,10 +80,6 @@ module CONN_OFFICE
         end		
     end
 
-    def is_alive?
-        Process.kill(0,@pid).include? @pid
-    end
-
     def dialog_boxes
         @get_window.call(@wid,6)!=0
     end
@@ -92,11 +88,10 @@ module CONN_OFFICE
         begin
             sleep(0.1) while dialog_boxes
             begin
-                @app.Quit if is_alive?
+                @app.Quit if is_connected?
             rescue
-                puts "Didn't respond to quit, trying to kill"
                 unless Process.kill(1,@pid).include?(@pid)
-                    loop until Process.kill(9,@pid).include(@pid)
+                    Process.kill(9,@pid).include(@pid)
                 end
             end
             @app.ole_free rescue nil
