@@ -8,7 +8,65 @@ class WindowOperations
     BMCLICK=0x00F5
     WM_DESTROY=0x0010
     User32=DL.dlopen("user32")
+  def initialize
+        @enum_windows = User32['EnumWindows', 'IPL']
+        @get_class_name = User32['GetClassName', 'ILpI']
+        @get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
+        @get_caption = User32['GetWindowTextA', 'iLsL' ]
+        @get_parent_window=User32['GetParent','II']
+        @enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
+        @switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
+        @closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
+        @results={}
+        @classname_buffer=' '
+        @classname=''
+        @r,@rs,@textLength,@a,@captionBuffer,@t,@textCaption,@caption,@hwnd,@lparam=nil
+        @parent_window,@unknown_var=nil
+        @enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
+            @r,@rs = @get_class_name.call(hwnd, @classname_buffer, @classname_buffer.size)
+            @classname=@rs[1].to_s
+            @textLength, @a = @get_caption_length.call(hwnd)
+            @captionBuffer = " " * (@textLength+1)
+            @t , @textCaption  = @get_caption.call(hwnd, @captionBuffer  , @textLength+1)    
+            @caption=String(@textCaption[1].to_s)
+            @results[hwnd]={:classname=>@classname,:caption=>@caption}
+            @closeHandle.call hwnd
+            -1
+        }
+        @enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
+            @r,@rs = @get_class_name.call(hwnd, @classname_buffer, @classname_buffer.size)
+            @classname=@rs[1].to_s
+            @textLength, @a = @get_caption_length.call(hwnd)
+            @captionBuffer = " " * (@textLength+1) # allow for null termination
+            @t , @textCaption  = @get_caption.call(hwnd, @captionBuffer, @captionBuffer.length)    
+            @caption=@textCaption[1].to_s
+            @parentwindow,@unknown_var=@get_parent_window.call(hwnd)
+            @results[hwnd]={:parent_window=>@parentwindow,:classname=>@classname,:caption=>@caption}
+                        @closeHandle.call hwnd
+            @closeHandle.call @parentwindow
 
+            -1 # -1 says keep going. Forget which constant it is.
+        }
+  end
+  
+  def close
+        @enum_windows = nil
+        @get_class_name = nil
+        @get_caption_length = nil
+        @get_caption = nil
+        @get_parent_window=nil
+        @enum_child_windows = nil
+        @switch_to_window = nil
+        @closeHandle = nil
+        @results=nil
+        @classname_buffer=nil
+        @classname=nil
+        @r,@rs,@textLength,@a,@captionBuffer,@t,@textCaption,@caption,@hwnd,@lparam=nil
+        @parent_window,@unknown_var=nil
+        DL.remove_callback @enum_windows_proc
+        DL.remove_callback @enum_child_windows_proc
+        end
+    
     def switch_to_window(hwnd)
         switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
         closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
@@ -22,82 +80,25 @@ class WindowOperations
         #This doesn't do what I expect, in that if you call enum_windows and look for windows that
         # have parent x, the results are different to calling enum_child_windows(hwnd(x))
 
-        enum_windows = User32['EnumWindows', 'IPL']
-        get_class_name = User32['GetClassName', 'ILpI']
-        get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
-        get_caption = User32['GetWindowTextA', 'iLsL' ]
-        get_parent_window=User32['GetParent','II']
-        enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
-        switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
+
         blk||=proc do true end
-        results={}
-        enum_child_windows_proc = DL.callback('ILL') {|hwnd,lparam|
-            classname_buffer=' '*32 # limit the classname to 32 bytes
-            r,rs = get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
-            classname=rs[1].to_s
-            textLength, a = get_caption_length.call(hwnd)
-            captionBuffer = " " * (textLength+1)
-            t , textCaption  = get_caption.call(hwnd, captionBuffer  , textLength+1)    
-            caption=String(textCaption[1].to_s)
-            results[hwnd]={:classname=>classname,:caption=>caption}
-            r,rs,a,t,textCaption=nil
-            closeHandle.call hwnd
-            -1
-        }
-        r=enum_child_windows.call(hwnd, enum_child_windows_proc,0)
-        DL.remove_callback(enum_child_windows_proc)
-        results.each {|k,v|
+        @results={}
+    
+        r=@enum_child_windows.call(hwnd, enum_child_windows_proc,0)
+        @results.each {|k,v|
             children=do_child_windows(k, &blk)
             v[:children]=children unless children.empty?
         }
-        enum_windows =nil
-        get_class_name =nil
-        get_caption_length =nil
-        get_caption =nil
-        get_parent_window=nil
-        enum_child_windows =nil
-        switch_to_window =nil
-        closeHandle =nil
         results.select &blk
     end
 
     def do_enum_windows(&blk)
-        enum_windows = User32['EnumWindows', 'IPL']
-        get_class_name = User32['GetClassName', 'ILpI']
-        get_caption_length = User32['GetWindowTextLengthA' ,'LI' ]
-        get_caption = User32['GetWindowTextA', 'iLsL' ]
-        get_parent_window=User32['GetParent','II']
-        enum_child_windows = User32['EnumChildWindows' , 'IIPL' ]
-        switch_to_window = User32['SwitchToThisWindow' , 'pLI'  ]
-        closeHandle = Win32API.new("kernel32", "CloseHandle", ['L'],'I')
         blk||=proc do true end
-        results={}
-        enum_windows_proc = DL.callback('ILL') {|hwnd,lparam|
-            classname_buffer=' '*32 # limit the classname to 32 bytes
-            r,rs = get_class_name.call(hwnd, classname_buffer, classname_buffer.size)
-            classname=rs[1].to_s
-            textLength, a = get_caption_length.call(hwnd)
-            captionBuffer = " " * (textLength+1) # allow for null termination
-            t , textCaption  = get_caption.call(hwnd, captionBuffer, captionBuffer.length)    
-            caption=textCaption[1].to_s
-            parentwindow,unknown_var=get_parent_window.call(hwnd)
-            results[hwnd]={:parent_window=>parentwindow,:classname=>classname,:caption=>caption}
-            r,rs,a,t,textCaption,parentwindow,unknown_var=nil
-            closeHandle.call hwnd
-            -1 # -1 says keep going. Forget which constant it is.
-        }
-        r,rs=enum_windows.call(enum_windows_proc,0)
-        DL.remove_callback(enum_windows_proc)
-        enum_windows =nil
-        get_class_name =nil
-        get_caption_length =nil
-        get_caption =nil
-        get_parent_window=nil
-        enum_child_windows =nil
-        switch_to_window =nil
-        closeHandle =nil
-        results.select &blk
+        @results={}
+
+        r=@enum_windows.call(@enum_windows_proc,0)
+
+        @results.select &blk
     end
 
     def send_window_message(hwnd, message)
