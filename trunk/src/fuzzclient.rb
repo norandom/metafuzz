@@ -136,6 +136,13 @@ module FuzzClient
             begin
                 FileUtils.rm_f(fn)
                 FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
+                Dir.glob(@config["WORK DIR"]+"\\~$*.doc", File::FNM_DOTMATCH).each {|fn| 
+                    begin
+                        FileUtils.rm_f(fn)
+                    rescue
+                        next # probably still open
+                    end
+                }
             rescue
                 raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
             end
