@@ -2,7 +2,6 @@ require 'win32ole'
 require 'fileutils'
 require 'Win32API'
 require 'win32/process'
-require 'windows_manipulation'
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
@@ -41,12 +40,12 @@ module CONN_OFFICE
     #Open the application via OLE	
     def establish_connection
         @appname = @module_args[0]
-        @wm=WindowOperations.new
         begin
             @app=WIN32OLE.new(@appname+'.Application')
             #@app.visible=true
             @pid,@wid=pid_from_app(@app)
             @app.DisplayAlerts=0
+            @get_window=Win32API.new("user32.dll","GetWindow",'LI','I')
         rescue
             close
             raise RuntimeError, "CONN_OFFICE: establish: couldn't open application. (#{$!})"
@@ -83,11 +82,11 @@ module CONN_OFFICE
     end
 
     def dialog_boxes
-        Thread.critical=true
-        children=@wm.do_enum_windows {|k,v| v[:parent_window]==@wid}
-        children.length > 0
-    ensure
-        Thread.critical=false
+      begin
+        result=@get_window.call(@wid,6)!=0
+        rescue
+        raise
+        end
     end
 
     def destroy_connection
@@ -103,7 +102,6 @@ module CONN_OFFICE
             @app.ole_free rescue nil
         ensure
             @app=nil
-            @wm=nil
         end
     end
 

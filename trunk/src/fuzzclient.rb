@@ -62,10 +62,14 @@ at_exit {
     end
     print "Done. Exiting.\n"
 }
+begin
 Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
     reg.delete_key "StartupItems" rescue nil
     reg.delete_key "DisabledItems" rescue nil
-end
+  end
+  rescue
+  nil
+  end
 
 
 module FuzzClient
@@ -136,13 +140,6 @@ module FuzzClient
             begin
                 FileUtils.rm_f(fn)
                 FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
-                Dir.glob(@config["WORK DIR"]+"\\~$*.doc", File::FNM_DOTMATCH).each {|fn| 
-                    begin
-                        FileUtils.rm_f(fn)
-                    rescue
-                        next # probably still open
-                    end
-                }
             rescue
                 raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
             end
@@ -162,6 +159,7 @@ module FuzzClient
                         @word=Connector.new(CONN_OFFICE, 'word')
                         break
                     rescue
+                        puts $!
                         sleep(1)
                         retry
                     end
