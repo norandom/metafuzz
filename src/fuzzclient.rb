@@ -176,6 +176,7 @@ module FuzzClient
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
             begin
+                print '1';$stdout.flush
                 @word.deliver this_test_filename
                 status="SUCCESS"
                 print '.';$stdout.flush
@@ -194,7 +195,9 @@ module FuzzClient
             # close the debugger and kill the app
             # This should kill the winword process as well
             # Clean up the connection object
+                print '2';$stdout.flush
             @word.close rescue nil
+                print '3';$stdout.flush
             debugger.close 
             clean_up(this_test_filename) 
             status
