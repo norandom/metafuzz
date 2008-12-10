@@ -1,5 +1,4 @@
 require 'win32ole'
-require 'fileutils'
 require 'Win32API'
 require 'win32/process'
 #Send data to an Office application via file, used for file fuzzing.
@@ -93,8 +92,9 @@ module CONN_OFFICE
         begin
             sleep(0.1) while dialog_boxes
             begin
-                @app.Quit if @app
+                @app.Quit
             rescue
+                puts "Didn't respond to quit, trying to kill"
                 unless Process.kill(1,@pid).include?(@pid)
                     loop until Process.kill(9,@pid).include(@pid)
                 end

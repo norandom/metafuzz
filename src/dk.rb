@@ -18,9 +18,14 @@ def kill_dialog_boxes
     child_hwnd=GetWindow.call(word_hwnd, GW_ENABLEDPOPUP)
     unless child_hwnd==0
         PostMessage.call(child_hwnd,WM_COMMAND,IDCANCEL,0)
+        sleep(0.1)
         PostMessage.call(child_hwnd,WM_COMMAND,IDNO,0)
-        PostMessage.call(child_hwnd,WM_COMMAND,IDOK,0)
+        sleep(0.1)
         PostMessage.call(child_hwnd,WM_COMMAND,IDCLOSE,0)
+        sleep(0.1)
+        PostMessage.call(child_hwnd,WM_COMMAND,IDOK,0)
+        sleep(0.1)
+        PostMessage.call(child_hwnd,WM_DESTROY,0,0)
     end
 end
 
