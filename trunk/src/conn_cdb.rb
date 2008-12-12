@@ -57,7 +57,7 @@ module CONN_CDB
     #Cleanly destroy the socket. 
     def destroy_connection
         #kill the CDB process
-        @debugger.close
+        @debugger.close rescue nil
         Process.kill(9,@cdb_pid) rescue nil
     end
 
