@@ -61,12 +61,13 @@ require 'objhax'
 # License: All components of this framework are licensed under the Common Public License 1.0. 
 # Please read LICENSE.TXT for details. Or see RDoc for the file license.rb
 class BinStruct
-  attr_reader :parent, :children, :fields, :separator
+  attr_reader :parent, :children, :fields, :separator, :groups
   attr_writer :fields, :separator
 
   # start BinStruct constructor / "meta" methods
   class << self
     attr_reader :parser_commands, :defaults, :friendly_values, :valid_values, :initial_separator_string, :initial_endianness
+    attr_reader :grouped_fields
   end
 
   def self.new( *args, &blk ) #:nodoc:
@@ -76,6 +77,7 @@ class BinStruct
     @friendly_values||={}
     @valid_values||={}
     @parser_commands||=[]
+    @initial_endianness="network"
     super
   end
 
@@ -123,7 +125,9 @@ class BinStruct
 
   #Link sets of fields, such as type, length, value sets or length, data pairs. This
   #will create metadata that the Fuzzer can use to create nastier output. (When it is actually implemented, that is...)
-  def self.link(sym, *other_syms)
+  def self.group(sym, *other_syms)
+      @grouped_fields||=Hash.new {|h,k| h[k]=[]}
+      @grouped_fields[sym] << other_syms
   end
 
   #Define a separator string that will be used during the <tt>pack</tt> or <tt>to_s</tt> methods
@@ -159,6 +163,7 @@ class BinStruct
     @parent=nil
     @separator=self.class.initial_separator_string || ''
     @endianness=self.class.initial_endianness
+    @groups=self.class.grouped_fields
     self.class.parser_commands.each {|fieldtype, name, length, desc, condition|
       if eval condition
         default=self.class.defaults[name]
@@ -188,6 +193,11 @@ class BinStruct
           current_field.set_value(new_val)
         end
       end
+    }
+    @groups.each {|group, contents|
+        unless contents.flatten.all? {|sym| @fields.any? {|field| field.name==sym}}
+            raise RuntimeError, "Binstruct: Construction: group #{group} contains invalid field name(s)"
+        end
     }
     # Shorten the input buffer to remove what we used. This is a bit spooky for structs that aren't byte aligned
     # but it's the best way I can think of. Remainders %8 will be packed according to their

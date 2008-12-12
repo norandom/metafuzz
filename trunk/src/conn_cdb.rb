@@ -50,14 +50,15 @@ module CONN_CDB
     #Return a boolen.
     def is_connected?
         # The process is alive - is that the same as connected?
+        # TODO: I don't think this method works...
         Process.kill(0,@cdb_pid).include?(@cdb_pid)
     end
 
     #Cleanly destroy the socket. 
     def destroy_connection
         #kill the CDB process
-        Process.kill(9,@cdb_pid) rescue nil
         @debugger.close
+        Process.kill(9,@cdb_pid) rescue nil
     end
 
     # Sugar from here on.
@@ -75,7 +76,7 @@ module CONN_CDB
 
     def target_running?
         state=qc_all.join
-        return false if state[-1]==32
+        return false if state[-1]==32 # 32 is space
         true
     end
 

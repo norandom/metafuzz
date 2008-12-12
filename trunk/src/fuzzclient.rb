@@ -186,6 +186,7 @@ module FuzzClient
                     status="CRASH"
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
+                    debugger.close
                 else
                     status="FAIL"
                     print '#';$stdout.flush

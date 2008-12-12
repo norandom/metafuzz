@@ -93,7 +93,7 @@ class << prod_queue
         Thread.critical=false
     end
 end
-
+=begin
 production=Thread.new do
     begin
         header,raw_fib,rest=""
@@ -105,7 +105,7 @@ production=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,64,64)
+        g=Generators::RollingCorrupt.new(raw_fib,11,5,10)
         while g.next?
             fuzzed=g.next
             raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
@@ -118,8 +118,10 @@ production=Thread.new do
         exit
     end
 end
-=begin
+=end
 prod_thread=Thread.new do
+    # This is bloat, but rewriting it as a nested loop would be a pain and
+    # probably 5 levels deep
     begin
         puts "Production thread starting..."
         unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
@@ -131,12 +133,273 @@ prod_thread=Thread.new do
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         fib=WordFIB.new(raw_fib)
-        fib.fcSttbfffn=0xffffffff
-        32768.times do |i|
-            fib.fcSttbfffn=0xffffffff - ((16*i)+1)
-            fuzzed=fib.to_s
-            prod_queue << (header+fuzzed+rest)
-        end
+        fib.groups[:ol].each {|fc,lcb|
+            orig_fc, orig_lcb=fib.send(fc), fib.send(lcb)
+            # + +
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+i)
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+i)
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*4)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*4)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*4))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*4))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*16)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*16)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*16))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*16))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*32)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*32)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*32))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*32))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            # + -
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+i)
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-i)
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*4)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*4)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*4))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*4))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*16)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*16)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*16))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*16))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+((i*32)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*32)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc+(i*32))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*32))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            # - +
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-i)
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+i)
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*4)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*4)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*4))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*4))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*16)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*16)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*16))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*16))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*32)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+((i*32)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*32))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb+(i*32))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            # - -
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-i)
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-i)
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*4)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*4)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*4))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*4))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*16)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*16)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*16))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*16))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            16.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-((i*32)-1))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-((i*32)-1))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+                begin
+                    fib.send((fc.to_s+'=').to_sym, orig_fc-(i*32))
+                    fib.send((lcb.to_s+'=').to_sym, orig_lcb-(i*32))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
+            fib.send((fc.to_s+'=').to_sym, orig_fc)
+            fib.send((lcb.to_s+'=').to_sym, orig_lcb)
+            raise RuntimeError, "Data Corruption" unless header+fib.to_s+rest == unmodified_file
+
+        }
         prod_queue.finish
         Thread.current.exit	
     rescue
@@ -144,7 +407,6 @@ prod_thread=Thread.new do
         exit
     end
 end
-=end
 class ResultTracker
 
     def initialize
@@ -165,7 +427,7 @@ class ResultTracker
 
     def remove_client
         Thread.critical
-        @clients+=1
+        @clients-=1
     ensure
         Thread.critical=false
     end
@@ -207,8 +469,8 @@ class ResultTracker
             @sent_mark=@sent
             @time_mark=Time.now
         end
-        puts "Results: crash: #{crashes}, hang: #{hangs}, fail: #{fails}, success: #{succeeded}, no result: #{unknown}."
-        puts "(#{@sent} sent, #{@results.length} in result hash. Performance: #{"%.2f"%((@sent-@sent_mark)/(Time.now-@time_mark).to_f)}/s #{@clients} current clients)"
+        print "\r"
+        print "Crash: #{crashes}, Fail: #{fails}, Success: #{succeeded}, #{@sent} currently @ #{"%.2f"%((@sent-@sent_mark)/(Time.now-@time_mark).to_f)}/s"
     ensure
         Thread.critical=false
     end
@@ -236,7 +498,7 @@ module FuzzServer
         if @production_queue.empty? and @production_queue.finished?
             send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
         else
-            if @config["USE THREADPOOL"]
+            unless @config["USE THREADPOOL"]
                 my_data=@production_queue.pop
                 id=@result_tracker.check_out
                 if @config["SEND DIFFS"]

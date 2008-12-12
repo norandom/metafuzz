@@ -95,6 +95,11 @@ File.open("fib.txt","w+") {|io|
 		end
 		io.puts "\tunsigned :#{line[0]}, #{line[1]}, \"#{line[2]}\""
 	}
+        final.each_with_index {|line, i|
+            if line[0]=~/^lcb/ and final[i-1][0]=~/^fc/
+                io.puts "\tgroup :ol, :#{final[i-1][0]}, :#{line[0]}"
+            end
+        }
 	io.puts
 	io.puts "\tendianness \"intel\""
 	io.puts "end"

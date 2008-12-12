@@ -20,6 +20,7 @@ class TestStruct < BinStruct #:nodoc:
 	default_value :short_value, 13
 	default_value :ipaddr, "192.168.13.12"
 	separator ' '
+        group :tlv, :length, :flags
 end
 
 context "A new BinStruct" do
@@ -172,6 +173,9 @@ context "The Binstruct instance methods" do
 	specify "should allow the fields to be pulled as an array" do
 		TestStruct.new.fields.class.should_equal Array
 	end
+        specify "should allow fields to be grouped correctly" do
+            p TestStruct.groups
+        end
 end
 
 

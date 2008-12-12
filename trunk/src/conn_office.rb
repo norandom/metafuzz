@@ -51,19 +51,17 @@ module CONN_OFFICE
         end
     end
 
-    # It would be lovely if this could check for dialogs or subwindows
-    # that need acknowledgement...
+    # Don't know what this could be good for...
     def blocking_read
         ''
     end
 
-    #Write a string to a file and open it in the application
+    # Take a filename and open it in the application
     def blocking_write( filename )
         raise RuntimeError, "CONN_OFFICE: blocking_write: Not connected!" unless is_connected?
         begin
             # this call blocks, so if it opens a dialog box immediately we lose control of the app. 
             # This is the biggest issue, and so far can only be solved with a separate monitor app
-            # that kills word processes that are hanging here.
             @app.Documents.Open({"FileName"=>filename,"AddToRecentFiles"=>false,"OpenAndRepair"=>false})
         rescue
             raise RuntimeError, "CONN_OFFICE: blocking_write: Couldn't write to application! (#{$!})"
@@ -91,6 +89,7 @@ module CONN_OFFICE
                 @app.Quit if is_connected?
             rescue
                 unless Process.kill(1,@pid).include?(@pid)
+                    sleep(0.5)
                     Process.kill(9,@pid).include(@pid)
                 end
             end
