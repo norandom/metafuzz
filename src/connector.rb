@@ -132,7 +132,7 @@ class Connector
 
     #Close the connection to the remote host. For some protocols this just closes the
     #local socket, for connection-oriented protocols like TCP it will reset the connection
-    #with the peer.
+    #with the peer. All that is defined by the connection module in destroy_connection.
     def close
         # If the user doesn't call this they will leak memory, because the receive
         # thread will hang around... so yeah, call close. :)

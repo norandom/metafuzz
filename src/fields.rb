@@ -31,7 +31,7 @@ module Fields
 
     attr_reader :bitstring, :desc, :length, :type, :default_value, :name, :length_type, :endianness
 
-    def initialize(bitstring, name, length, desc, default,endian="network")
+    def initialize(bitstring, name, length, desc, default, endian)
       @name=name
       @length=length
       @desc=desc
@@ -162,8 +162,8 @@ module Fields
 
   class OctetstringField < Field
 
-    def initialize(bitstring, name, length, desc, default)
-      raise ArgumentError, "OctetstringField  (#{name})(CREATE): Length must be a multiple of 8 bits" unless length%8==0
+    def initialize(*args)
+      raise ArgumentError, "OctetstringField  (#{args[1]})(CREATE): Length must be a multiple of 8 bits" unless args[2]%8==0
       @length_type="fixed"
       super
     end

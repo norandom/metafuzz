@@ -1,5 +1,6 @@
 require 'pp'
 # I AM NOT THREAD SAFE!
+# In fact I don't really work at all, because DL leaks memory like a sieve.
 class WindowOperations
 
     require 'dl'
