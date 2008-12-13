@@ -419,28 +419,21 @@ class ResultTracker
     end
 
     def add_client
-        Thread.critical
+        Thread.critical=true
         @clients+=1
     ensure
         Thread.critical=false
     end
 
     def remove_client
-        Thread.critical
+        Thread.critical=true
         @clients-=1
     ensure
         Thread.critical=false
     end
 
-    def increment_sent
-        Thread.critical
-        @sent+=1
-    ensure
-        Thread.critical=false
-    end
-
     def add_result(id, status)
-        Thread.critical
+        Thread.critical=true
         unless @results[id]=="CHECKED OUT"
             raise RuntimeError, "RT: The id not checked out yet?"
         end
@@ -450,8 +443,8 @@ class ResultTracker
     end
 
     def check_out
-        Thread.critical
-        increment_sent
+        Thread.critical=true
+        @sent+=1
         @results[@sent]="CHECKED OUT"
         @sent
     ensure
@@ -459,7 +452,7 @@ class ResultTracker
     end
 
     def spit_results
-        Thread.critical
+        Thread.critical=true
         succeeded=@results.select {|k,v| v=="SUCCESS"}.length
         hangs=@results.select {|k,v| v=="HANG"}.length
         fails=@results.select {|k,v| v=="FAIL"}.length
@@ -491,7 +484,12 @@ module FuzzServer
 
     def handle_client_result(msg)
         result_id,result_status=msg.data.split(':')
-        @result_tracker.add_result(Integer(result_id),result_status)
+        begin
+            @result_tracker.add_result(Integer(result_id),result_status)
+        rescue
+            sleep 1
+            @result_tracker.add_result(Integer(result_id),result_status)
+        end
     end
 
     def handle_client_ready

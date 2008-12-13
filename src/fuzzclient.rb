@@ -159,9 +159,8 @@ module FuzzClient
                         @word=Connector.new(CONN_OFFICE, 'word')
                         break
                     rescue
-                        puts $!
                         sleep(1)
-                        retry
+                        next
                     end
                 end
                 current_pid=@word.pid
