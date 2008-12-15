@@ -32,7 +32,6 @@ def kill_dialog_boxes
         PostMessage.call(toplevel_box,WM_COMMAND,IDNO,0)
         PostMessage.call(toplevel_box,WM_COMMAND,IDCLOSE,0)
         PostMessage.call(toplevel_box,WM_COMMAND,IDOK,0)
-        PostMessage.call(toplevel_box,WM_DESTROY,0,0)
       end
 end
 
