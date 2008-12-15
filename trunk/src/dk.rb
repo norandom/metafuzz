@@ -23,7 +23,17 @@ def kill_dialog_boxes
         PostMessage.call(child_hwnd,WM_COMMAND,IDCLOSE,0)
         PostMessage.call(child_hwnd,WM_COMMAND,IDOK,0)
         PostMessage.call(child_hwnd,WM_DESTROY,0,0)
-    end
+      end
+      # The script changes the caption, so this should only detect toplevel dialog boxes
+      # that pop up during open.
+      toplevel_box=FindWindow.call(0, "Microsoft Office Word")
+      unless toplevel_box==0
+        PostMessage.call(toplevel_box,WM_COMMAND,IDCANCEL,0)
+        PostMessage.call(toplevel_box,WM_COMMAND,IDNO,0)
+        PostMessage.call(toplevel_box,WM_COMMAND,IDCLOSE,0)
+        PostMessage.call(toplevel_box,WM_COMMAND,IDOK,0)
+        PostMessage.call(toplevel_box,WM_DESTROY,0,0)
+      end
 end
 
 loop do
