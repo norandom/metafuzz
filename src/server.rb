@@ -122,7 +122,7 @@ production=Thread.new do
             gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},5000)
             gLetters=Mutations.create_string_generator(['p'],5000)
             gInject=Generators::Chain.new(gJunk,gLetters)
-            while gInject.next
+            while gInject.next?
                 prod_queue << (head+gInject.next+tail)
             end
         end
