@@ -93,23 +93,32 @@ class << prod_queue
         Thread.critical=false
     end
 end
-=begin
+
 production=Thread.new do
     begin
-        header,raw_fib,rest=""
         unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
+=begin
+        header,raw_fib,rest=""
         File.open( 'c:\share\boof.doc',"rb") {|io| 
             header=io.read(512)
             raw_fib=io.read(1472)
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
+=end
         prod_queue.template=unmodified_file
-        g=Generators::RollingCorrupt.new(raw_fib,11,5,10)
-        while g.next?
-            fuzzed=g.next
-            raise RuntimeError, "Data Corruption" unless fuzzed.length==raw_fib.length
-            prod_queue << (header+fuzzed+rest)
+        loop do
+            insertion_start=rand(unmodified_file.length)
+            insertion_finish=insertion_start+rand(256)+1
+            head=unmodified_file[0..insertion_start-1]
+            fuzz=unmodified_file[insertion_start..insertion_finish]
+            tail=unmodified_file[insertion_finish+1..-1]
+            raise RuntimeError, "Data Corruption" unless head+fuzz+tail == unmodified_file
+            g=Generators::RollingCorrupt.new(fuzz,16,16,16)
+            while g.next?
+                fuzz=g.next
+                prod_queue << (head+fuzz+tail)
+            end
         end
         prod_queue.finish
         Thread.current.exit	
@@ -118,7 +127,8 @@ production=Thread.new do
         exit
     end
 end
-=end
+
+=begin
 prod_thread=Thread.new do
     # This is bloat, but rewriting it as a nested loop would be a pain and
     # probably 5 levels deep
@@ -135,6 +145,17 @@ prod_thread=Thread.new do
         fib=WordFIB.new(raw_fib)
         fib.groups[:ol].each {|fc,lcb|
             orig_fc, orig_lcb=fib.send(fc), fib.send(lcb)
+            # rand, rand
+            32.times do |i|
+                begin
+                    fib.send((fc.to_s+'=').to_sym, rand(2**fib[fc].length))
+                    fib.send((lcb.to_s+'=').to_sym, rand(2**fib[lcb].length))
+                rescue
+                    next
+                end
+                fuzzed=fib.to_s
+                prod_queue << (header+fuzzed+rest)
+            end
             # + +
             16.times do |i|
                 begin
@@ -395,6 +416,7 @@ prod_thread=Thread.new do
                 fuzzed=fib.to_s
                 prod_queue << (header+fuzzed+rest)
             end
+
             fib.send((fc.to_s+'=').to_sym, orig_fc)
             fib.send((lcb.to_s+'=').to_sym, orig_lcb)
             raise RuntimeError, "Data Corruption" unless header+fib.to_s+rest == unmodified_file
@@ -407,6 +429,7 @@ prod_thread=Thread.new do
         exit
     end
 end
+=end
 class ResultTracker
 
     def initialize

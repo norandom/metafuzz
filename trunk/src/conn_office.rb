@@ -4,8 +4,8 @@ require 'win32/process'
 #Send data to an Office application via file, used for file fuzzing.
 #
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
-#The general process should be for the connector to store any string it is passed for the write in a
-#file of the correct type, and then open the file in the application.
+#Currently the calling code is expected to manage the files, so the deliver method takes a filename as
+#its parameter
 module CONN_OFFICE
 
     #These methods will override the stubs present in the Connector
