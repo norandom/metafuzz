@@ -314,7 +314,6 @@ module Generators
     class Chain < Generator
         def initialize ( *generators )
             @generators=generators
-
             @block=proc {|g|
                 generators.each {|gen|
                     while gen.next?
@@ -337,6 +336,27 @@ module Generators
         end
     end
 
+    class Rand < Generator
+        def initialize ( bitlength, count )
+            @bitlength, @count=bitlength, count
+            @block=proc {|g|
+                @count.times do
+                    g.yield(rand(2**bitlength))
+                end
+            }
+            @index = 0 
+            @queue = [] 
+            @cont_next = @cont_yield = @cont_endp = nil 
+            if @cont_next = callcc { |c| c } 
+                @block.call(self) 
+                @cont_endp.call(nil) if @cont_endp 
+            end 
+        end
+
+        def rewind()
+            initialize(@bitlength, @count) if @index.nonzero?
+        end
+    end
     # Parameters: String, Bitlength, Stepsize,Random Cases=0
     # Will corrupt Bitlength bits of the provided string by substituting each of the binary outputs
     # of the BinaryCornerCases generator. At each step it will advance the 'rolling window' that is
@@ -347,19 +367,17 @@ module Generators
     # of random binary strings to the corruption
     class RollingCorrupt < Generator
         def initialize(str, bitlength, stepsize,random_cases=0)
-            @str,@bitlength,@stepsize=str,bitlength,stepsize
+            @str,@bitlength,@stepsize,@random_cases=str,bitlength,stepsize,random_cases
             @binstr=str.unpack('B*').first
             raise RuntimeError, "Generators::RollingCorrupt: internal bitstring conversion broken?" unless @binstr.length==(@str.length*8)
             @block=proc {|g|
                 gBin=Generators::BinaryCornerCases.new(bitlength)
                 if random_cases > 0
-                    gRand=Generator.new {|g|
-                        random_cases.times do
-                            g.yield(rand(2**bitlength))
-                        end
-                    }
+                    gRand=Generators::Rand.new(bitlength, random_cases)
+                    gFinal=Generators::Chain.new(gBin,gRand)
+                else
+                    gFinal=gBin
                 end
-                gFinal=Generators::Chain.new(gBin,gRand)
                 rng=Range.new(0, @binstr.length-1)
                 rng.step(stepsize) {|idx|
                     gFinal.rewind
