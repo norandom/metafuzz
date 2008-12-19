@@ -77,7 +77,8 @@ class BinStruct
     @friendly_values||={}
     @valid_values||={}
     @parser_commands||=[]
-    @initial_endianness="network"
+    @grouped_fields||=Hash.new {|h,k| h[k]=[]}
+    @initial_endianness||="network"
     super
   end
 
@@ -126,7 +127,7 @@ class BinStruct
   #Link sets of fields, such as type, length, value sets or length, data pairs. This
   #will create metadata that the Fuzzer can use to create nastier output. (When it is actually implemented, that is...)
   def self.group(sym, *other_syms)
-      @grouped_fields||=Hash.new {|h,k| h[k]=[]}
+    @grouped_fields||=Hash.new {|h,k| h[k]=[]}
       @grouped_fields[sym] << other_syms
   end
 
@@ -139,7 +140,7 @@ class BinStruct
     @initial_separator_string=String(separator_string)
   end
   
-  def self.endianness( endianness="network" )
+  def self.endianness( endianness )
 	unless endianness.downcase=="network" or endianness.downcase=="intel"
 		raise ArgumentError, "Binstruct: Unknown endianness #{endianness}, use 'intel' or 'network' (default)."
 	end

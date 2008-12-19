@@ -7,6 +7,7 @@ WORD_PATH='c:/program files/microsoft office/office12'
 CDB_PATH='C:/Program Files/Debugging Tools for Windows (x86)'
 CRASHFILE_PATH='C:/fuzzclient'
 
+#TODO: This method doesn't work if the file doesn't actually cause a crash.
 # each file to analyze
 Dir.glob("#{CRASHFILE_PATH}/crash*.doc").each {|currentfile|
     # Remove the word registry values that enable safe mode and disabled items
