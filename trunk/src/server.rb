@@ -6,7 +6,9 @@ require 'thread'
 require 'fuzzer'
 require 'fib'
 require 'diff/lcs'
-
+require 'wordstruct'
+require 'ole/storage'
+require 'mutations'
 
 default_config={"AGENT NAME"=>"SERVER",
     "SERVER IP"=>"0.0.0.0",
@@ -24,8 +26,14 @@ if config_file and not File.exists? config_file
     puts "FuzzServer: Bad config file #{config_file}, using default config."
     config=default_config
 elsif not config_file
-    puts "FuzzServer: Using default config."
-    config=default_config
+    if File.exists?(File.join(default_config["CONFIG DIR"],"fuzzserver_config.txt"))
+        puts "FuzzServer: Loading from default config file."
+        config_data=File.open(File.join(default_config["CONFIG DIR"],"fuzzserver_config.txt"), "r") {|io| io.read}
+        config=YAML::load(config_data)
+    else
+        puts "Fuzzserver: Using default config."
+        config=default_config
+    end
 else
     begin
         config_data=File.open(config_file, "r") {|io| io.read}
@@ -43,6 +51,16 @@ end
         if answer =~ /^[yY]/
             begin
                 Dir.mkdir(config[dirname])
+                if dirname=="CONFIG DIR"
+                    print "Saving config to #{config["CONFIG DIR"]}..."
+                    begin
+                        File.open(File.join(config["CONFIG DIR"],"fuzzserver_config.txt"),"w+") { |io|
+                            io.write(YAML::dump(config))
+                        }
+                    rescue
+                        puts "FuzzServer: Couldn't write out config."
+                    end
+                end
             rescue
                 raise RuntimeError, "FuzzServer: Couldn't create directory: #{$!}"
             end
@@ -96,8 +114,59 @@ end
 
 production=Thread.new do
     begin
-        unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
+        unmodified_file=File.open( 'c:\bunk\foo.doc',"rb") {|io| io.read}
+        header,raw_fib,rest=""
+        prod_queue.template=unmodified_file
+        FileUtils.copy('c:\bunk\foo.doc','c:\bunk\tmp.doc')
+        File.open( 'c:\bunk\tmp.doc',"rb") {|io| 
+            header=io.read(512)
+            raw_fib=io.read(1472)
+            rest=io.read
+        }
+        raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
+        fib=WordStructures::WordFIB.new(raw_fib)
+        # Open the file, get a copy of the table stream
+        ole=Ole::Storage.open('c:\bunk\foo.doc','rb')
+        table_stream=ole.file.read("1Table")
+        ole.close
+        fib.groups[:ol].each {|fc,lcb|
+            100.times do
+                gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},50000)
+                while gJunk.next?
+                    # Append random junk to the end of the stream
+                    fuzzed_table=table_stream + gJunk.next
+                    # open the new file and insert the modified table stream
+                    Ole::Storage.open('c:\bunk\tmp.doc','rb+') {|ole|
+                        ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
+                    }
+                    # Read in the new file contents
+                    File.open( 'c:\bunk\tmp.doc',"rb") {|io| 
+                        header=io.read(512)
+                        raw_fib=io.read(1472)
+                        rest=io.read
+                    }
+                    newfib=WordStructures::WordFIB.new(raw_fib)
+                    # point the fc to the start of the junk
+                    newfib.send((fc.to_s+'=').to_sym, table_stream.length)
+                    # set the lcb to the size of the junk
+                    newfib.send((lcb.to_s+'=').to_sym, fuzzed_table.length-table_stream.length)
+                    # and add it to the queue.
+                    prod_queue << (header+newfib.to_s+rest)
+                end
+            end
+        }
+        prod_queue.finish
+        Thread.current.exit	
+    rescue
+        puts "Production failed: #{$!}";$stdout.flush
+        exit
+    end
+end
+
 =begin
+production=Thread.new do
+    begin
+        unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
         header,raw_fib,rest=""
         File.open( 'c:\share\boof.doc',"rb") {|io| 
             header=io.read(512)
@@ -105,7 +174,6 @@ production=Thread.new do
             rest=io.read
         }
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
-=end
         prod_queue.template=unmodified_file
         loop do
             insertion_start=rand(unmodified_file.length)
@@ -133,7 +201,7 @@ production=Thread.new do
         exit
     end
 end
-
+=end
 =begin
 prod_thread=Thread.new do
     # This is bloat, but rewriting it as a nested loop would be a pain and
