@@ -11,26 +11,33 @@ require 'win32/registry'
 
 
 default_config={"AGENT NAME"=>"CLIENT1",
-    "SERVER IP"=>"192.168.241.2",
+    "SERVER IP"=>"127.0.0.1",
     "SERVER PORT"=>10000,
     "WORK DIR"=>'C:\fuzzclient',
     "CONFIG DIR"=>'C:\fuzzclient',
     "POLL INTERVAL"=>5
 }
 
+
 config_file=ARGV[0]
 if config_file and not File.exists? config_file
-    puts "Fuzzclient: Bad config file #{config_file}, using default config."
+    puts "FuzzClient: Bad config file #{config_file}, using default config."
     config=default_config
 elsif not config_file
-    puts "Fuzzclient: Using default config."
-    config=default_config
+    if File.exists?(File.join(default_config["CONFIG DIR"],"fuzzserver_config.txt"))
+        puts "FuzzClient: Loading from default config file."
+        config_data=File.open(File.join(default_config["CONFIG DIR"],"fuzzclient_config.txt"), "r") {|io| io.read}
+        config=YAML::load(config_data)
+    else
+        puts "Fuzzserver: Using default config."
+        config=default_config
+    end
 else
     begin
         config_data=File.open(config_file, "r") {|io| io.read}
         config=YAML::load(config_data)
     rescue
-        puts "Fuzzclient: Bad config file #{config_file}, using default config."
+        puts "FuzzClient: Bad config file #{config_file}, using default config."
         config=default_config
     end
 end
@@ -42,11 +49,21 @@ end
         if answer =~ /^[yY]/
             begin
                 Dir.mkdir(config[dirname])
+                if dirname=="CONFIG DIR"
+                    print "Saving config to #{config["CONFIG DIR"]}..."
+                    begin
+                        File.open(File.join(config["CONFIG DIR"],"fuzzclient_config.txt"),"w+") { |io|
+                            io.write(YAML::dump(config))
+                        }
+                    rescue
+                        puts "FuzzClient: Couldn't write out config."
+                    end
+                end
             rescue
-                raise RuntimeError, "Fuzzclient: Couldn't create directory: #{$!}"
+                raise RuntimeError, "FuzzClient: Couldn't create directory: #{$!}"
             end
         else
-            raise RuntimeError, "Fuzzclient: #{dirname} unavailable. Exiting."
+            raise RuntimeError, "FuzzClient: #{dirname} unavailable. Exiting."
         end
     end
 }
@@ -58,18 +75,19 @@ at_exit {
             io.write(YAML::dump(config))
         }
     rescue
-        puts "Fuzzclient: Couldn't write out config."
+        puts "FuzzClient: Couldn't write out config."
     end
     print "Done. Exiting.\n"
 }
+
 begin
-Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
-    reg.delete_key "StartupItems" rescue nil
-    reg.delete_key "DisabledItems" rescue nil
-  end
-  rescue
-  nil
-  end
+    Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
+        reg.delete_key "StartupItems" rescue nil
+        reg.delete_key "DisabledItems" rescue nil
+    end
+rescue
+    nil
+end
 
 
 module FuzzClient
@@ -77,7 +95,6 @@ module FuzzClient
     def initialize(config)
         @config=config
     end
-
 
     def send_client_shutdown
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
@@ -139,6 +156,7 @@ module FuzzClient
         10.times do
             begin
                 FileUtils.rm_f(fn)
+                # TODO: Fix this, it doesn't quite work.
                 FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
             rescue
                 raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
@@ -179,12 +197,14 @@ module FuzzClient
                 status="SUCCESS"
                 print '.';$stdout.flush
             rescue
-                # check AV status
+                # check for crashes
                 sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
                     status="CRASH"
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
+                    # If the app has crashed we should kill the debugger, otherwise
+                    # the app won't be killed without -9.
                     debugger.close
                 else
                     status="FAIL"
@@ -200,7 +220,7 @@ module FuzzClient
             status
         rescue
             raise RuntimeError, "Delivery: fatal: #{$!}"
-            # ask the server to revert me to my snapshot
+            # ask the server to revert me to my snapshot?
         end
     end
 
@@ -226,7 +246,7 @@ module FuzzClient
                     status="ERROR"
                     puts $!
                     EventMachine::stop_event_loop
-                    raise RuntimeError, "Something is fucked. Dying #{$!}"
+                    raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
                 end
                 send_result "#{msg.id}:#{status}"
                 send_client_ready

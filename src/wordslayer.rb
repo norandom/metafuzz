@@ -1,3 +1,4 @@
+require 'rubygems'
 require 'win32/process'
 require 'win32ole'
 require 'fileutils'
