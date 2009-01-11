@@ -115,11 +115,11 @@ end
 
 production=Thread.new do
     begin
-        unmodified_file=File.open( 'c:\bunk\foo.doc',"rb") {|io| io.read}
+        unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
         header,raw_fib,rest=""
         prod_queue.template=unmodified_file
-        FileUtils.copy('c:\bunk\foo.doc','c:\bunk\tmp.doc')
-        File.open( 'c:\bunk\tmp.doc',"rb") {|io| 
+        FileUtils.copy('c:\share\boof.doc','c:\share\tmp.doc')
+        File.open( 'c:\share\tmp.doc',"rb") {|io| 
             header=io.read(512)
             raw_fib=io.read(1472)
             rest=io.read
@@ -127,7 +127,7 @@ production=Thread.new do
         raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
         fib=WordStructures::WordFIB.new(raw_fib)
         # Open the file, get a copy of the table stream
-        ole=Ole::Storage.open('c:\bunk\foo.doc','rb')
+        ole=Ole::Storage.open('c:\share\boof.doc','rb')
         table_stream=ole.file.read("1Table")
         ole.close
         fib.groups[:ol].each {|fc,lcb|
@@ -137,11 +137,11 @@ production=Thread.new do
                     # Append random junk to the end of the stream
                     fuzzed_table=table_stream + gJunk.next
                     # open the new file and insert the modified table stream
-                    Ole::Storage.open('c:\bunk\tmp.doc','rb+') {|ole|
+                    Ole::Storage.open('c:\share\tmp.doc','rb+') {|ole|
                         ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
                     }
                     # Read in the new file contents
-                    File.open( 'c:\bunk\tmp.doc',"rb") {|io| 
+                    File.open( 'c:\share\tmp.doc',"rb") {|io| 
                         header=io.read(512)
                         raw_fib=io.read(1472)
                         rest=io.read
