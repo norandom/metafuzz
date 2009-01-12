@@ -85,7 +85,7 @@ module Mutations
 	#
 	#Looks up the field.type as a string in a Replacement_Generators hash, so users can expand the repetoire of
 	#generators by creating custom field types that require particular fuzzing approaches.
-	def replace_field(field, coverage, maxlen) #:yields:replacement_data
+	def replace_field(field, maxlen, fuzzlevel) #:yields:replacement_data
 		#grab a generator
 		g=Replacement_Generators[field.type].call(field, maxlen)
 		while g.next?
@@ -99,7 +99,7 @@ module Mutations
 	#Looks up the field.type as a string in an Injection_Generators hash, so users can expand the repetoire of
 	#generators by creating custom field types that require particular fuzzing approaches. The separator string
 	#for the structure (if any) is also passed as a parameter, and will be expanded during the fuzzing process.
-	def inject_data(field, maxlen) #:yields:data_to_inject
+	def inject_data(field, maxlen, fuzzlevel) #:yields:data_to_inject
 		#grab a generator
 		g=Injection_Generators[field.type].call(maxlen, @binstruct.separator)
 		while g.next?
