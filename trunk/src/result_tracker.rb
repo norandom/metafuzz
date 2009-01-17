@@ -3,23 +3,45 @@ class ResultTracker
 
     def initialize
         @sent=0
-        @clients=0
+        @prod_clients=0
+        @fuzz_clients=0
         @mutex=Mutex.new
         @results={}
         @time_mark=Time.now
         @sent_mark=0
     end
 
-    def add_client
+    def production_clients
         Thread.critical=true
-        @clients+=1
+        @prod_clients
     ensure
         Thread.critical=false
     end
 
-    def remove_client
+    def add_fuzz_client
         Thread.critical=true
-        @clients-=1
+        @fuzz_clients+=1
+    ensure
+        Thread.critical=false
+    end
+
+    def remove_fuzz_client
+        Thread.critical=true
+        @fuzz_clients-=1
+    ensure
+        Thread.critical=false
+    end
+
+    def add_production_client
+        Thread.critical=true
+        @prod_clients+=1
+    ensure
+        Thread.critical=false
+    end
+
+    def remove_production_client
+        Thread.critical=true
+        @prod_clients-=1
     ensure
         Thread.critical=false
     end
@@ -39,6 +61,13 @@ class ResultTracker
         @sent+=1
         @results[@sent]="CHECKED OUT"
         @sent
+    ensure
+        Thread.critical=false
+    end
+    
+    def results_outstanding
+        Thread.critical=true
+        @results.select {|k,v| v=="CHECKED OUT"}.length
     ensure
         Thread.critical=false
     end

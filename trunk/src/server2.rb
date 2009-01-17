@@ -13,7 +13,7 @@ require 'result_tracker'
 
 default_config={"AGENT NAME"=>"SERVER",
     "SERVER IP"=>"0.0.0.0",
-    "SERVER PORT"=>10000,
+    "SERVER PORT"=>10001,
     "WORK DIR"=>'C:\fuzzserver',
     "CONFIG DIR"=>'C:\fuzzserver',
     "COMPRESSION"=>false,
@@ -113,112 +113,26 @@ class << prod_queue
     end
 end
 
-production=Thread.new do
-    begin
-        unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
-        header,raw_fib,rest=""
-        prod_queue.template=unmodified_file
-        FileUtils.copy('c:\share\boof.doc','c:\share\tmp.doc')
-        File.open( 'c:\share\tmp.doc',"rb") {|io| 
-            header=io.read(512)
-            raw_fib=io.read(1472)
-            rest=io.read
-        }
-        raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
-        fib=WordStructures::WordFIB.new(raw_fib)
-        # Open the file, get a copy of the table stream
-        ole=Ole::Storage.open('c:\share\boof.doc','rb')
-        table_stream=ole.file.read("1Table")
-        ole.close
-        fib.groups[:ol][2..-1].each {|fc,lcb|
-=begin
-            100.times do
-                gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},50000)
-                while gJunk.next?
-                    # Append random junk to the end of the stream
-                    fuzzed_table=table_stream + gJunk.next
-                    # open the new file and insert the modified table stream
-                    Ole::Storage.open('c:\share\tmp.doc','rb+') {|ole|
-                        ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
-                    }
-                    # Read in the new file contents
-                    File.open( 'c:\share\tmp.doc',"rb") {|io| 
-                        header=io.read(512)
-                        raw_fib=io.read(1472)
-                        rest=io.read
-                    }
-                    newfib=WordStructures::WordFIB.new(raw_fib)
-                    # point the fc to the start of the junk
-                    newfib.send((fc.to_s+'=').to_sym, table_stream.length)
-                    # set the lcb to the size of the junk
-                    newfib.send((lcb.to_s+'=').to_sym, fuzzed_table.length-table_stream.length)
-                    # and add it to the queue.
-                    prod_queue << (header+newfib.to_s+rest)
-                end
-            end
-=end
-            next if fib.send(lcb)==0
-            #get the head, fuzztarget and rest from the table stream
-            ts_head=table_stream[0,fib.send(fc)]
-            fuzztarget=table_stream[fib.send(fc),fib.send(lcb)]
-            ts_rest=table_stream[fib.send(fc)+fib.send(lcb)..-1]
-            raise RuntimeError, "Data Corruption" unless (ts_head+fuzztarget+ts_rest)==table_stream
-            raise RuntimeError, "Data Corruption" unless fib.send(lcb)==fuzztarget.length
-            #create a new Fuzzer using the fuzztarget
-            bs=Fuzzer.string_to_binstruct(fuzztarget,16)
-            raise RuntimeError, "Data Corruption" unless bs.to_s == fuzztarget
-            f=Fuzzer.new(bs)
-            f.basic_tests(1024,false) {|fuzz|
-                #head+fuzzed+rest
-                fuzzed_table=ts_head+fuzz.to_s+ts_rest
-                #write the modified stream
-                Ole::Storage.open('c:\share\tmp.doc','rb+') {|ole|
-                    ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
-                }
-                # Read in the new file contents
-                File.open( 'c:\share\tmp.doc',"rb") {|io| 
-                    header=io.read(512)
-                    raw_fib=io.read(1472)
-                    rest=io.read
-                }
-                newfib=WordStructures::WordFIB.new(raw_fib)
-                #adjust the lcb
-                newfib.send((lcb.to_s+'=').to_sym, fuzz.length)
-                #adjust the offsets for all subsequent structures
-                extra=fuzz.length-fuzztarget.length
-                if extra > 0
-                    fib.groups[:ol].each {|off,len|
-                        if (fib.send(off) > fib.send(fc)) and fib.send(len) > 0
-                            newfib.send((off.to_s+'=').to_sym, fib.send(off)+extra)
-                        end
-                    }
-                end
-                #add to the queue
-                prod_queue << (header+newfib.to_s+rest)
-            }
-        }
-        prod_queue.finish
-        Thread.current.exit	
-    rescue
-        puts "Production failed: #{$!}";$stdout.flush
-        exit
-    end
-end
-
 module FuzzServer
 
     def initialize(prod_queue, rt, config)
         @config=config
         @production_queue=prod_queue
-        @template=@production_queue.template
+        @template=false
         @result_tracker=rt
         @handler=NetStringTokenizer.new
-        EM.add_periodic_timer(30) {@result_tracker.spit_results}
+        EM.add_periodic_timer(30) do 
+            @result_tracker.spit_results
+            if @production_queue.empty? and @production_queue.finished? and @result_tracker.results_outstanding==0
+                puts "All done, shutting down."
+                EventMachine::stop_event_loop
+            end
+        end
         at_exit {@result_tracker.spit_results}
     end
 
 
-    def handle_client_result(msg)
+    def handle_result( msg )
         result_id,result_status=msg.data.split(':')
         begin
             @result_tracker.add_result(Integer(result_id),result_status)
@@ -228,19 +142,15 @@ module FuzzServer
         end
     end
 
-    def handle_client_ready
+    # Only comes from fuzzclients.
+    def handle_client_ready( msg )
         if @production_queue.empty? and @production_queue.finished?
-            send_data(@handler.pack(FuzzMessage.new({:verb=>"SERVER FINISHED"}).to_yaml))
+            send_data(@handler.pack(FuzzMessage.new({:verb=>:server_bye}).to_yaml))
         else
             unless @config["USE THREADPOOL"]
                 my_data=@production_queue.pop
                 id=@result_tracker.check_out
-                if @config["SEND DIFFS"]
-                    diffs=Diff::LCS.diff(@template,my_data)
-                    send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>diffs,:id=>id}).to_yaml)
-                else
-                    send_data @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
-                end
+                send_data @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
             else
                 # define a block to prepare the response
                 get_data=proc do
@@ -249,12 +159,7 @@ module FuzzServer
                     my_data=@production_queue.pop
                     id=@result_tracker.check_out
                     # This is what will be passed to the callback
-                    if @config["SEND DIFFS"]
-                        diffs=Diff::LCS.diff(@template,my_data)
-                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>diffs,:id=>id}).to_yaml)
-                    else
-                        @handler.pack(FuzzMessage.new({:verb=>"DELIVER",:data=>my_data,:id=>id}).to_yaml)
-                    end
+                    @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
                 end
                 # This callback will be invoked once the response is ready.
                 callback=proc do |data|
@@ -266,36 +171,69 @@ module FuzzServer
         end
     end
 
-    def handle_client_startup
-        send_data @handler.pack(FuzzMessage.new({:verb=>"TEMPLATE",:data=>@template}).to_yaml)
-        @result_tracker.add_client
+    def handle_client_startup( msg )
+        case msg.client_type
+        when :fuzz
+            @result_tracker.add_fuzz_client
+            if @config["SEND DIFFS"]
+                sleep 0.1 until @template # in case the fuzzclient starts up before the production client
+                send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready,:template=>@template}).to_yaml)
+            else
+                send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready,:template=>false}).to_yaml)
+            end
+        when :production
+            @result_tracker.add_production_client
+            if @config["SEND DIFFS"]
+                unless msg.template
+                    raise RuntimeError, "FuzzServer: configured for diffs, production client sent no template?"
+                end
+                @template=msg.template
+            end
+            send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
+        else
+            raise RuntimeError, "FuzzServer: Bad client type #{msg.client_type}"
+        end
     end
 
-    def handle_client_shutdown
-        @result_tracker.remove_client
-        if @production_queue.empty? and @production_queue.finished? and @result_tracker.clients <=0
-            puts "All done, shutting down."
-            EventMachine::stop_event_loop
+    def handle_new_test_case( msg )
+        send_data @handler.pack(FuzzMessage.new({:verb=>:ack_case, :id=>msg.id}).to_yaml)
+        unless @config["USE THREADPOOL"]
+            @production_queue << msg.data # this blocks if the queue is full
+            send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
+        else
+            # define a block to prepare the response
+            get_data=proc do
+                # This pop will block until data is available
+                # but since we are using EM.defer that's OK
+                @production_queue << msg.data # this blocks if the queue is full
+                # This is what will be passed to the callback
+                @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
+            end
+            # This callback will be invoked once the response is ready.
+            callback=proc do |data|
+                send_data data
+            end
+            # Send the work to the thread queue, so we are ready for more connections.
+            EM.defer(get_data, callback)
         end
+    end
+
+    def handle_client_bye( msg )
+        @result_tracker.send("remove_"+msg.client_type+"_client")
+        if @result_tracker.production_clients==0
+            @production_queue.finish
+        end
+    end
+
+    def method_missing( meth, *args )
+        raise RuntimeError, "Unknown Command: #{meth.to_s}!"
     end
 
     def receive_data(data)
-        @handler.parse(data).each do |m| 
+        @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
-            case msg.verb
-            when "CLIENT RESULT"
-                handle_client_result(msg)
-            when "CLIENT READY"
-                handle_client_ready
-            when "CLIENT STARTUP"
-                handle_client_startup
-            when "CLIENT SHUTDOWN"
-                handle_client_shutdown
-            else
-                #unknown command, real programmer would error handle.
-                nil
-            end
-        end
+            self.send("handle_"+msg.verb.to_s, msg)
+        }
     end
 
 end
