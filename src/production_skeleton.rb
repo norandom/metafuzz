@@ -15,6 +15,7 @@ default_config={"AGENT NAME"=>"PRODCLIENT1",
     "WORK DIR"=>'C:\prodclient',
     "CONFIG DIR"=>'C:\prodclient',
     "POLL INTERVAL"=>5,
+    "SEND DIFFS"=>false,
     "FUZZCODE FILE"=>'word_randomfuzz.rb'
 }
 
@@ -84,50 +85,62 @@ require config["FUZZCODE FILE"]
 
 module ProductionClient
 
-    def initialize(config)
-        @config=config
-        @server_ready=false
-        @prodmodule=Producer # This module is defined in the FUZZCODE FILE param of the config
-        @send_queue=Queue.new
-        @idtracker=[]
-        @case_id=0
-        @handler=NetStringTokenizer.new
-    end
-
     # Send methods...
 
     def send_test_case( tc, case_id )
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        msg=@handler.pack(FuzzMessage.new({
-            :verb=>:new_test_case,
-            :station_id=>@config["AGENT NAME"],
-            :id=>case_id
-            :data=>tc}).to_yaml)
-            send_data msg
+        if config["SEND DIFFS"]
+            diffs=Diff::LCS.diff(@prodmodule::Template,tc)
+            msg=@handler.pack(FuzzMessage.new({
+                :verb=>:new_test_case,
+                :data=>diffs,
+                :station_id=>@config["AGENT NAME"],
+                :id=>case_id}).to_yaml)
+        else
+            msg=@handler.pack(FuzzMessage.new({
+                :verb=>:new_test_case,
+                :station_id=>@config["AGENT NAME"],
+                :id=>case_id,
+                :data=>tc}).to_yaml)
+        end
+        send_data msg
     end
 
-    def send_client_shutdown
+    def send_client_bye
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         msg=@handler.pack(FuzzMessage.new({
-            :verb=>:production_client_shutdown,
+            :verb=>:client_bye,
+            :client_type=>:production,
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-            send_data msg
+        send_data msg
     end
 
     def send_client_startup
+        puts "ProdClient: Trying to connect to #{@config["SERVER IP"]} : #{@config["SERVER PORT"]}" 
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        msg=@handler.pack(FuzzMessage.new({
-            :verb=>:production_client_startup,
-            :station_id=>@config["AGENT NAME"],
-            :data=>""}).to_yaml)
-            send_data msg
-            @initial_connect=EventMachine::DefaultDeferrable.new
-            @initial_connect.timeout(@config["POLL INTERVAL"])
-            @initial_connect.errback do
-                puts "ProdClient: Connection timed out. Retrying."
-                send_client_startup
-            end
+        if @config["SEND DIFFS"]
+            msg=@handler.pack(FuzzMessage.new({
+                :verb=>:client_startup,
+                :client_type=>:production,
+                :station_id=>@config["AGENT NAME"],
+                :template=>@prodmodule::Template,
+                :data=>""}).to_yaml)
+        else
+            msg=@handler.pack(FuzzMessage.new({
+                :verb=>:client_startup,
+                :client_type=>:production,
+                :template=>false,
+                :station_id=>@config["AGENT NAME"],
+                :data=>""}).to_yaml)
+        end
+        send_data msg
+        @initial_connect=EventMachine::DefaultDeferrable.new
+        @initial_connect.timeout(@config["POLL INTERVAL"])
+        @initial_connect.errback do
+            puts "ProdClient: Connection timed out. Retrying."
+            send_client_startup
+        end
     end
 
     # Receive methods...
@@ -141,7 +154,13 @@ module ProductionClient
             @initial_connect.succeed
             @initial_connect=false
         end
-        @server_ready=true
+        if @production_generator.next?
+            @case_id+=1
+            @idtracker << @case_id
+            send_test_case @production_generator.next, @case_id
+        else
+            send_client_bye
+        end
     end
 
     def handle_server_bye( msg )
@@ -151,19 +170,18 @@ module ProductionClient
         raise RuntimeError, "Unknown Command: #{meth.to_s}!"
     end
 
+    def initialize(config)
+        @config=config
+        @server_ready=false
+        # The Producer module must be defined in the FUZZCODE FILE param of the config
+        @production_generator=Generator.new {|g| Producer.each_item {|i| g.yield i}}
+        @idtracker=[]
+        @case_id=0
+        @handler=NetStringTokenizer.new
+    end
+
     def post_init
         send_client_startup
-        sleep(0.1) until @server_ready
-        @prodmodule.each_item {|test_case|
-            @case_id+=1
-            # Add this case to the back of the queue
-            @send_queue.push test_case
-            @idtracker << @case_id
-            # Send the front item in the queue
-            @server_ready=false
-            send_test_case @send_queue.pop, @case_id
-            sleep(0.1) until @server_ready
-        }
     end
 
     # FuzzMessage#verb returns a symbol, so self.send activates
@@ -180,4 +198,4 @@ end
 EventMachine::run {
     EventMachine::connect(config["SERVER IP"],config["SERVER PORT"], ProductionClient, config)
 }
-puts "Event loop stopped. Shutting down.
+puts "Event loop stopped. Shutting down."
