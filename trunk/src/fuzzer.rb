@@ -22,14 +22,15 @@ class Fuzzer
     def self.string_to_binstruct( str, granularity=8 )
         strclone=str.clone
         chunk_array=[]
+        chunk_size=str.length/granularity > 0 ? str.length/granularity : 1
         while strclone.length > 0
-            chunk_array << strclone.slice!(0,rand(str.length/granularity)+1)
+            chunk_array << strclone.slice!(0,chunk_size)
         end
         raise RuntimeError, "Fuzzer: Data corruption while converting string to BinStruct" unless str==chunk_array.join
         bstruct=BinStruct.new
         chunk_array.each {|elem|
             #add elem to bstruct
-            inject_field=Fields::StringField.new(elem.unpack('B*').join,'injected',elem.length*8,"This field was injected",nil,"intel")
+            inject_field=Fields::StringField.new(elem.unpack('B*').join,'injected',elem.length*8,"This field was injected",nil,bstruct.endianness)
             bstruct.fields << inject_field
         }
         bstruct
@@ -52,7 +53,7 @@ class Fuzzer
         @check=@binstruct.to_s
     end
 
-    def dry_run(overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1)
+    def count_tests(overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1)
         num_tests=0
         self.basic_tests(overflow_maxlen, send_unfixed, fuzzlevel) {|t| num_tests+=1}
         num_tests
@@ -119,7 +120,7 @@ class Fuzzer
             # sometimes)
             unless @preserve_length
                 inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
-                    inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,"intel")
+                    inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,@binstruct.endianness)
                     @binstruct.fields.insert(@binstruct.fields.index(current_field),inject_field)
                     yield @binstruct if send_unfixed || @fixups==nil
                     yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
@@ -129,7 +130,7 @@ class Fuzzer
                 # if this is the last field, dump the chunks afterwards as well.
                 if current_field==@binstruct.fields.last
                     inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
-                        inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,"intel")
+                        inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,@binstruct.endianness)
                         @binstruct.fields << inject_field 
                         yield @binstruct if send_unfixed || @fixups==nil
                         yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
