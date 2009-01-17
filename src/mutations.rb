@@ -56,7 +56,10 @@ module Mutations
 	# if the field is <= 8 bits in length. For longer fields it will yield a set of binary corner cases.
 	# For variable length fields like strings, hexstrings and the like it expands them by repeating the field up to maxlen times. 
 	# and then runs a rolling corruption pass over them at the binary level (see the RollingCorrupt Generator)
-	# corrupting 13 bits with a stepsize of 3 then 17 bits with a stepsize of 17. Finally, it successively removes
+	# corrupting 13 bits with a stepsize of 3 then 17 bits with a stepsize of 17. 
+        # At the minute it also adds 32 random cases when doing the binary corruption, so take
+        # care if you don't have any way to capture your test cases.
+        # Finally, it successively removes
 	# the middle third of the string until it is length 2.
 	# Users would want to add
 	# new blocks to the hash when they have types that need complicated fuzzing, eg ASN.1,
@@ -73,10 +76,10 @@ module Mutations
 			end
 		elsif field.length_type=="variable"
 			rep=Generators::Repeater.new(field.get_value,0,0,maxlen,proc {|a| a.to_s})
-			rc1=Generators::RollingCorrupt.new(field.get_value,8,8)
-			rc2=Generators::RollingCorrupt.new(field.get_value,16,16)
+			rc1=Generators::RollingCorrupt.new(field.get_value,13,3,32)
+			rc2=Generators::RollingCorrupt.new(field.get_value,17,17,32)
 			chopper=Generators::Chop.new(field.get_value)
-			g=Generators::Chain.new(rep,rc1,rc2, chopper)
+			g=Generators::Chain.new(rc1,rc2,rep,chopper)
 		else
 			raise RuntimeError, "Mutations::replace_field: Unknown length type #{field.length_type}"
 		end
@@ -91,6 +94,7 @@ module Mutations
 		while g.next?
 			yield g.next
 		end 
+                g=nil
 	end #replace_field
 	
 	#Yields a series of data elements that can be injected immediately before the field which is passed as a parameter,
@@ -105,6 +109,7 @@ module Mutations
 		while g.next?
 			yield g.next
 		end
+                g=nil
 	end #inject_data
 	
 end

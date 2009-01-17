@@ -130,7 +130,7 @@ production=Thread.new do
         ole=Ole::Storage.open('c:\share\boof.doc','rb')
         table_stream=ole.file.read("1Table")
         ole.close
-        fib.groups[:ol][15..-1].each {|fc,lcb|
+        fib.groups[:ol][2..-1].each {|fc,lcb|
 =begin
             100.times do
                 gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},50000)
@@ -159,7 +159,6 @@ production=Thread.new do
 =end
             next if fib.send(lcb)==0
             #get the head, fuzztarget and rest from the table stream
-            puts "Starting #{fc.to_s}, #{lcb.to_s}, #{fib.send(lcb)}"
             ts_head=table_stream[0,fib.send(fc)]
             fuzztarget=table_stream[fib.send(fc),fib.send(lcb)]
             ts_rest=table_stream[fib.send(fc)+fib.send(lcb)..-1]
@@ -169,7 +168,6 @@ production=Thread.new do
             bs=Fuzzer.string_to_binstruct(fuzztarget,16)
             raise RuntimeError, "Data Corruption" unless bs.to_s == fuzztarget
             f=Fuzzer.new(bs)
-            #puts "Expecting #{f.count_tests(1024,false)} tests..."
             f.basic_tests(1024,false) {|fuzz|
                 #head+fuzzed+rest
                 fuzzed_table=ts_head+fuzz.to_s+ts_rest

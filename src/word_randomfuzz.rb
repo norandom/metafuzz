@@ -34,7 +34,6 @@ module Producer
                 while gJunk.next?
                     # Append random junk to the end of the stream
                     fuzzed_table=table_stream + gJunk.next
-                    puts "#{fib[fc].name}, #{fuzzed_table.length}"
                     # open the new file and insert the modified table stream
                     Ole::Storage.open('c:\bunk\tmp.doc','rb+') {|ole|
                         ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
@@ -51,7 +50,7 @@ module Producer
                     # set the lcb to the size of the junk
                     newfib.send((lcb.to_s+'=').to_sym, fuzzed_table.length-table_stream.length)
                     # and add it to the queue.
-                    yield (header+fib.to_s+rest)
+                    yield (header+newfib.to_s+rest)
                 end
             }
         end
