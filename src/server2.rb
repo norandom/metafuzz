@@ -121,6 +121,7 @@ module FuzzServer
         @template=false
         @result_tracker=rt
         @handler=NetStringTokenizer.new
+        puts "FuzzServer: Starting up..."
         EM.add_periodic_timer(30) do 
             @result_tracker.spit_results
             if @production_queue.empty? and @production_queue.finished? and @result_tracker.results_outstanding==0
@@ -170,6 +171,7 @@ module FuzzServer
     end
 
     def handle_client_startup( msg )
+        p msg
         case msg.client_type
         when :fuzz
             @result_tracker.add_fuzz_client
@@ -233,6 +235,7 @@ module FuzzServer
     def receive_data(data)
         @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
+            puts "Got #{msg.verb} from #{msg.station_id}"
             self.send("handle_"+msg.verb.to_s, msg)
         }
     end

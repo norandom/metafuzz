@@ -12,13 +12,12 @@ require 'mutations'
 
 module Producer
 
-    Template=File.open( 'c:\bunk\foo.doc',"rb") {|io| io.read}
+    Template=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
 
     def each_item
         begin
-            unmodified_file=File.open( 'c:\share\boof.doc',"rb") {|io| io.read}
+            unmodified_file=Template
             header,raw_fib,rest=""
-            prod_queue.template=unmodified_file
             FileUtils.copy('c:\share\boof.doc','c:\share\tmp.doc')
             File.open( 'c:\share\tmp.doc',"rb") {|io| 
                 header=io.read(512)
@@ -31,7 +30,7 @@ module Producer
             ole=Ole::Storage.open('c:\share\boof.doc','rb')
             table_stream=ole.file.read("1Table")
             ole.close
-            fib.groups[:ol][50..-1].each {|fc,lcb
+            fib.groups[:ol][50..-1].each {|fc,lcb|
                 next if fib.send(lcb)==0
                 #get the head, fuzztarget and rest from the table stream
                 puts "Starting #{fc.to_s}, #{lcb.to_s}, #{fib.send(lcb)}"
@@ -71,7 +70,7 @@ module Producer
                         }
                     end
                     #add to the queue
-                    yield (header+newfib.to_s+rest)
+                    yield( (header+newfib.to_s+rest) )
                 }
             }
         rescue
