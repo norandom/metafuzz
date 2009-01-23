@@ -89,7 +89,7 @@ module ProductionClient
 
     def send_test_case( tc, case_id )
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        if config["SEND DIFFS"]
+        if @config["SEND DIFFS"]
             diffs=Diff::LCS.diff(@prodmodule::Template,tc)
             msg=@handler.pack(FuzzMessage.new({
                 :verb=>:new_test_case,
@@ -190,6 +190,7 @@ module ProductionClient
     def receive_data(data)
         @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
+            p msg
             self.send("handle_"+msg.verb.to_s, msg)
         }
     end

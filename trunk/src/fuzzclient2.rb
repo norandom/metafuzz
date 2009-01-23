@@ -102,7 +102,6 @@ module FuzzClient
         @template=""
         puts "FuzzClient: Starting up..."
         send_client_startup
-        at_exit {send_client_bye}
     end
 
     def prepare_test_file(data, msg_id)
@@ -207,6 +206,7 @@ module FuzzClient
         msg=@handler.pack(FuzzMessage.new({
             :verb=>:client_startup,
             :station_id=>@config["AGENT NAME"],
+            :client_type=>:fuzz,
             :data=>""}).to_yaml)
         @initial_connect=EventMachine::DefaultDeferrable.new
         @initial_connect.timeout(@config["POLL INTERVAL"])
@@ -221,7 +221,6 @@ module FuzzClient
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         msg=@handler.pack(FuzzMessage.new({
             :verb=>:client_ready,
-            :client_type=>:fuzz,
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
         send_data msg
