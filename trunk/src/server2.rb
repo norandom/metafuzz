@@ -197,18 +197,17 @@ module FuzzServer
     end
 
     def handle_new_test_case( msg )
-        send_data @handler.pack(FuzzMessage.new({:verb=>:ack_case, :id=>msg.id}).to_yaml)
+        server_id=@result_tracker.check_out
+        send_data @handler.pack(FuzzMessage.new({:verb=>:ack_case, :id=>msg.id, :server_id=>server_id}).to_yaml)
         unless @config["USE THREADPOOL"]
-            server_id=@result_tracker.check_out
             @production_queue << [server_id, msg.data] # this blocks if the queue is full
             send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
         else
             # define a block to prepare the response
             get_data=proc do
-                # This pop will block until data is available
+                # This push will block until the queue has room
                 # but since we are using EM.defer that's OK
-                server_id=@result_tracker.check_out
-                @production_queue << [server_id, msg.data] # this blocks if the queue is full
+                @production_queue << [server_id, msg.data]
                 # This is what will be passed to the callback
                 @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
             end
@@ -235,7 +234,6 @@ module FuzzServer
     def receive_data(data)
         @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
-            puts "Got #{msg.verb} from #{msg.station_id}"
             self.send("handle_"+msg.verb.to_s, msg)
         }
     end

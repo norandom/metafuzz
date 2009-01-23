@@ -122,8 +122,6 @@ module FuzzClient
         10.times do
             begin
                 FileUtils.rm_f(fn)
-                # TODO: Fix this, it doesn't quite work.
-                FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
             rescue
                 raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
             end

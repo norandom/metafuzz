@@ -384,10 +384,25 @@ module Generators
                     while gFinal.next?
                         out_str=@binstr.clone
                         out_str[idx..idx+(bitlength-1)] = "%.#{bitlength}b" % gFinal.next
-                        g.yield [out_str[0..@binstr.length-1]].pack('B*')
+                        out_str=[out_str[0..@binstr.length-1]].pack('B*')
+                        raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
+                        g.yield out_str
                     end
+                    [1,3,5,9].each {|num|
+                        out_str=@binstr.clone
+                        to_change=out_str[idx..idx+(bitlength-1)]
+                        changed="%.#{bitlength}b" % (to_change.to_i(2) + num)
+                        out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
+                        out_str=[out_str[0..@binstr.length-1]].pack('B*')
+                        raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
+                        g.yield out_str
+                        changed="%.#{bitlength}b" % (to_change.to_i(2) - num)
+                        out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
+                        out_str=[out_str[0..@binstr.length-1]].pack('B*')
+                        raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
+                        g.yield out_str
+                    }
                 }
-
             }
             @index = 0 
             @queue = [] 
