@@ -190,7 +190,6 @@ module ProductionClient
     def receive_data(data)
         @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
-            p msg
             self.send("handle_"+msg.verb.to_s, msg)
         }
     end

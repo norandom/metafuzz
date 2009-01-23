@@ -41,5 +41,5 @@ loop do
     rescue 
         puts "Wordslayer: DK: #{$!}"
     end
-    sleep(0.1)
+    sleep(0.5)
 end

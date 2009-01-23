@@ -56,7 +56,7 @@ module Mutations
 	# if the field is <= 8 bits in length. For longer fields it will yield a set of binary corner cases.
 	# For variable length fields like strings, hexstrings and the like it expands them by repeating the field up to maxlen times. 
 	# and then runs a rolling corruption pass over them at the binary level (see the RollingCorrupt Generator)
-	# corrupting 13 bits with a stepsize of 3 then 17 bits with a stepsize of 17. 
+	# corrupting 13 bits with a stepsize of 4 then 16 bits with a stepsize of 16. 
         # At the minute it also adds 32 random cases when doing the binary corruption, so take
         # care if you don't have any way to capture your test cases.
         # Finally, it successively removes
@@ -77,7 +77,7 @@ module Mutations
 		elsif field.length_type=="variable"
 			rep=Generators::Repeater.new(field.get_value,0,0,maxlen,proc {|a| a.to_s})
 			rc1=Generators::RollingCorrupt.new(field.get_value,13,3,32)
-			rc2=Generators::RollingCorrupt.new(field.get_value,17,17,32)
+			rc2=Generators::RollingCorrupt.new(field.get_value,16,16,32)
 			chopper=Generators::Chop.new(field.get_value)
 			g=Generators::Chain.new(rc1,rc2,rep,chopper)
 		else
