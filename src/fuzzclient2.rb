@@ -24,12 +24,12 @@ if config_file and not File.exists? config_file
     puts "FuzzClient: Bad config file #{config_file}, using default config."
     config=default_config
 elsif not config_file
-    if File.exists?(File.join(default_config["CONFIG DIR"],"fuzzserver_config.txt"))
+    if File.exists?(File.join(default_config["CONFIG DIR"],"fuzzclient_config.txt"))
         puts "FuzzClient: Loading from default config file."
         config_data=File.open(File.join(default_config["CONFIG DIR"],"fuzzclient_config.txt"), "r") {|io| io.read}
         config=YAML::load(config_data)
     else
-        puts "Fuzzserver: Using default config."
+        puts "FuzzClient: Using default config."
         config=default_config
     end
 else
