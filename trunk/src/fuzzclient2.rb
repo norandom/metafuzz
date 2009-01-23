@@ -102,7 +102,7 @@ module FuzzClient
         @template=""
         puts "FuzzClient: Starting up..."
         send_client_startup
-        at_exit {send_client_shutdown}
+        at_exit {send_client_bye}
     end
 
     def prepare_test_file(data, msg_id)
@@ -136,7 +136,7 @@ module FuzzClient
 
     def deliver(data,msg_id)
         begin
-            status="ERROR"
+            status=:error
             this_test_filename=prepare_test_file(data, msg_id)
             begin
                 5.times do
@@ -161,20 +161,20 @@ module FuzzClient
             debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
-                status="SUCCESS"
+                status=:success
                 print '.';$stdout.flush
             rescue
                 # check for crashes
                 sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
-                    status="CRASH"
+                    status=:crash
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                     # If the app has crashed we should kill the debugger, otherwise
                     # the app won't be killed without -9.
                     debugger.close
                 else
-                    status="FAIL"
+                    status=:fail
                     print '#';$stdout.flush
                 end
             end
@@ -193,75 +193,83 @@ module FuzzClient
 
     # Protocol Send functions
     
-    def send_client_shutdown
+    def send_client_bye
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT SHUTDOWN",
+        msg=@handler.pack(FuzzMessage.new({
+            :verb=>:client_bye,
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-            send_data ready_msg
+        send_data msg
     end
 
     def send_client_startup
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT STARTUP",
+        msg=@handler.pack(FuzzMessage.new({
+            :verb=>:client_startup,
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-            send_data ready_msg
-            @initial_connect=EventMachine::DefaultDeferrable.new
-            @initial_connect.timeout(@config["POLL INTERVAL"])
-            @initial_connect.errback do
-                puts "Fuzzclient: Connection timed out. Retrying."
-                send_client_startup
-            end
+        @initial_connect=EventMachine::DefaultDeferrable.new
+        @initial_connect.timeout(@config["POLL INTERVAL"])
+        @initial_connect.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_startup
+        end
+        send_data msg
     end
 
     def send_client_ready
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT READY",
+        msg=@handler.pack(FuzzMessage.new({
+            :verb=>:client_ready,
+            :client_type=>:fuzz,
             :station_id=>@config["AGENT NAME"],
             :data=>""}).to_yaml)
-            send_data ready_msg
+        send_data msg
     end
 
-    def send_result(data='')
+    def send_result(id, data)
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT RESULT",
+        msg=@handler.pack(FuzzMessage.new({
+            :verb=>:result,
             :station_id=>@config["AGENT NAME"],
+            :id=>id,
             :data=>data}).to_yaml)
-            send_data ready_msg
+        send_data msg
     end
 
     # Protocol Receive functions
 
     def handle_deliver( msg )
-        #fuzzfile=Diff::LCS.patch(@template,msg.data)
-        fuzzfile=msg.data
+        if @template
+            fuzzfile=Diff::LCS.patch(@template,msg.data)
+        else
+            fuzzfile=msg.data
+        end
         begin
             status=deliver(fuzzfile,msg.id)
         rescue
-            status="ERROR"
+            status=:error
             puts $!
             EventMachine::stop_event_loop
             raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
         end
-        send_result "#{msg.id}:#{status}"
+        send_result msg.id, status
+        send_client_ready
+    end
+
+    def handle_server_ready( msg )
+        if @initial_connect
+            @initial_connect.succeed
+            @initial_connect=false
+        end
+        @template=msg.template
         send_client_ready
     end
     
     def handle_server_bye( msg )
         puts "FuzzClient: Server is finished."
-        send_client_shutdown
+        send_client_bye
         EventMachine::stop_event_loop
-    end
-
-    def handle_template( msg )
-        @initial_connect.succeed
-        @template=msg.data
-        send_client_ready
     end
 
     def method_missing( meth, *args )

@@ -48,7 +48,7 @@ class ResultTracker
 
     def add_result(id, status)
         Thread.critical=true
-        unless @results[id]=="CHECKED OUT"
+        unless @results[id]==:checked_out
             raise RuntimeError, "RT: The id not checked out yet?"
         end
         @results[id]=status
@@ -59,7 +59,7 @@ class ResultTracker
     def check_out
         Thread.critical=true
         @sent+=1
-        @results[@sent]="CHECKED OUT"
+        @results[@sent]=:checked_out
         @sent
     ensure
         Thread.critical=false
@@ -67,18 +67,18 @@ class ResultTracker
     
     def results_outstanding
         Thread.critical=true
-        @results.select {|k,v| v=="CHECKED OUT"}.length
+        @results.select {|k,v| v==:checked_out}.length
     ensure
         Thread.critical=false
     end
 
     def spit_results
         Thread.critical=true
-        succeeded=@results.select {|k,v| v=="SUCCESS"}.length
-        hangs=@results.select {|k,v| v=="HANG"}.length
-        fails=@results.select {|k,v| v=="FAIL"}.length
-        crashes=@results.select {|k,v| v=="CRASH"}.length
-        unknown=@results.select {|k,v| v=="CHECKED OUT"}.length
+        succeeded=@results.select {|k,v| v==:success}.length
+        hangs=@results.select {|k,v| v==:hang}.length
+        fails=@results.select {|k,v| v==:fail}.length
+        crashes=@results.select {|k,v| v==:crash}.length
+        unknown=@results.select {|k,v| v==:checked_out}.length
         if @sent%100==0
             @sent_mark=@sent
             @time_mark=Time.now
