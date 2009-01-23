@@ -16,7 +16,7 @@ default_config={"AGENT NAME"=>"PRODCLIENT1",
     "CONFIG DIR"=>'C:\prodclient',
     "POLL INTERVAL"=>5,
     "SEND DIFFS"=>false,
-    "FUZZCODE FILE"=>'word_randomfuzz.rb'
+    "FUZZCODE FILE"=>'word_dggfuzz.rb'
 }
 
 

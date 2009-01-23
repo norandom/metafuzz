@@ -133,7 +133,7 @@ module FuzzServer
 
 
     def handle_result( msg )
-        result_id,result_status=msg.data.split(':')
+        result_id,result_status=msg.id, msg.data
         begin
             @result_tracker.add_result(Integer(result_id),result_status)
         rescue
@@ -148,16 +148,14 @@ module FuzzServer
             send_data(@handler.pack(FuzzMessage.new({:verb=>:server_bye}).to_yaml))
         else
             unless @config["USE THREADPOOL"]
-                my_data=@production_queue.pop
-                id=@result_tracker.check_out
+                id, my_data=@production_queue.pop
                 send_data @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
             else
                 # define a block to prepare the response
                 get_data=proc do
                     # This pop will block until data is available
                     # but since we are using EM.defer that's OK
-                    my_data=@production_queue.pop
-                    id=@result_tracker.check_out
+                    id, my_data=@production_queue.pop
                     # This is what will be passed to the callback
                     @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
                 end
@@ -176,6 +174,7 @@ module FuzzServer
         when :fuzz
             @result_tracker.add_fuzz_client
             if @config["SEND DIFFS"]
+                # TODO: this probably won't work
                 sleep 0.1 until @template # in case the fuzzclient starts up before the production client
                 send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready,:template=>@template}).to_yaml)
             else
@@ -198,14 +197,16 @@ module FuzzServer
     def handle_new_test_case( msg )
         send_data @handler.pack(FuzzMessage.new({:verb=>:ack_case, :id=>msg.id}).to_yaml)
         unless @config["USE THREADPOOL"]
-            @production_queue << msg.data # this blocks if the queue is full
+            server_id=@result_tracker.check_out
+            @production_queue << [server_id, msg.data] # this blocks if the queue is full
             send_data @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
         else
             # define a block to prepare the response
             get_data=proc do
                 # This pop will block until data is available
                 # but since we are using EM.defer that's OK
-                @production_queue << msg.data # this blocks if the queue is full
+                server_id=@result_tracker.check_out
+                @production_queue << [server_id, msg.data] # this blocks if the queue is full
                 # This is what will be passed to the callback
                 @handler.pack(FuzzMessage.new({:verb=>:server_ready}).to_yaml)
             end

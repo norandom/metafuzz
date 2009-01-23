@@ -130,7 +130,7 @@ production=Thread.new do
         ole=Ole::Storage.open('c:\share\boof.doc','rb')
         table_stream=ole.file.read("1Table")
         ole.close
-        fib.groups[:ol][15..-1].each {|fc,lcb|
+        fib.groups[:ol][50..-1].each {|fc,lcb|
 =begin
             100.times do
                 gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},50000)
