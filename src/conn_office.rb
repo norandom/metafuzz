@@ -79,6 +79,7 @@ module CONN_OFFICE
     end
 
     def dialog_boxes
+        # 0x06 == GW_ENABLEDPOPUP, which is for subwindows that have grabbed focus.
         @get_window.call(@wid,6)!=0
     end
 
