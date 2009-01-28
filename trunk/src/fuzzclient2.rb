@@ -166,6 +166,7 @@ module FuzzClient
                 sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
                     status=:crash
+                    sleep(0.1) while debugger.target_running?
                     extended_data=debugger.dq_all.join
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
