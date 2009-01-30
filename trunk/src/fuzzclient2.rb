@@ -156,7 +156,7 @@ module FuzzClient
             # -pb don't request an initial break
             # -x ignore first chance exceptions
             # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;g\\\" av;g\" -hd -sflags 0x4000 -x -xi ld -p #{current_pid}")
+            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;g\\\" av;g\" -hd -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
                 status=:success
