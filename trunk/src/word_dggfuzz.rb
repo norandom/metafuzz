@@ -9,6 +9,7 @@ require 'diff/lcs'
 require 'wordstruct'
 require 'ole/storage'
 require 'mutations'
+require 'tempfile'
 
 module Producer
 
@@ -18,8 +19,9 @@ module Producer
         begin
             unmodified_file=Template
             header,raw_fib,rest=""
-            FileUtils.copy('c:\share\boof.doc','c:\share\tmp.doc')
-            File.open( 'c:\share\tmp.doc',"rb") {|io| 
+            temp_file=Tempfile.new('wordfuzz')
+            File.open(temp_file.path,"wb+") {|io| io.write Template}
+            File.open(temp_file.path, "rb") {|io| 
                 header=io.read(512)
                 raw_fib=io.read(1472)
                 rest=io.read
@@ -48,11 +50,11 @@ module Producer
                     #head+fuzzed+rest
                     fuzzed_table=ts_head+fuzz.to_s+ts_rest
                     #write the modified stream
-                    Ole::Storage.open('c:\share\tmp.doc','rb+') {|ole|
+                    Ole::Storage.open(temp_file.path,'rb+') {|ole|
                         ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
                     }
                     # Read in the new file contents
-                    File.open( 'c:\share\tmp.doc',"rb") {|io| 
+                    File.open( temp_file.path,"rb") {|io| 
                         header=io.read(512)
                         raw_fib=io.read(1472)
                         rest=io.read
