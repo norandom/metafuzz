@@ -134,7 +134,7 @@ module FuzzClient
     def deliver(data,msg_id)
         begin
             status=:error
-            extended_data="" # will only be set to anything if there's a crash
+            crash_details="" # will only be set to anything if there's a crash
             this_test_filename=prepare_test_file(data, msg_id)
             begin
                 5.times do
@@ -152,11 +152,11 @@ module FuzzClient
             end
             # Attach debugger
             # -snul - don't load symbols
-            # -hd don't use the debug heap - NOT USED AT THE MOMENT
+            # -hd don't use the debug heap
             # -pb don't request an initial break
             # -x ignore first chance exceptions
             # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -pb -x -xi ld -p #{current_pid}")
+            debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
                 status=:success
@@ -167,7 +167,7 @@ module FuzzClient
                 if debugger.crash?
                     status=:crash
                     sleep(0.1) while debugger.target_running?
-                    extended_data=debugger.dq_all.join
+                    crash_details=debugger.dq_all.join
                     File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                     # If the app has crashed we should kill the debugger, otherwise
@@ -184,7 +184,7 @@ module FuzzClient
             @word.close rescue nil
             debugger.close 
             clean_up(this_test_filename) 
-            [status,extended_data]
+            [status,crash_details]
         rescue
             raise RuntimeError, "Delivery: fatal: #{$!}"
             # ask the server to revert me to my snapshot?
@@ -227,14 +227,14 @@ module FuzzClient
         send_data msg
     end
 
-    def send_result(id, status, data)
+    def send_result(id, status, crash_details)
         self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
         msg=@handler.pack(FuzzMessage.new({
             :verb=>:result,
             :station_id=>@config["AGENT NAME"],
             :id=>id,
             :status=>status,
-            :data=>data}).to_yaml)
+            :data=>crash_details}).to_yaml)
         send_data msg
     end
 
@@ -247,14 +247,14 @@ module FuzzClient
             fuzzfile=msg.data
         end
         begin
-            status,data=deliver(fuzzfile,msg.id)
+            status,crash_details=deliver(fuzzfile,msg.id)
         rescue
             status=:error
             puts $!
             EventMachine::stop_event_loop
             raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
         end
-        send_result msg.id, status, data
+        send_result msg.id, status, crash_details
         send_client_ready
     end
 

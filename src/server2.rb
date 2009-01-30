@@ -136,12 +136,16 @@ module FuzzServer
     def handle_result( msg )
         result_id,result_status,data=msg.id, msg.status, msg.data
         puts data unless data.empty? # testing, testing...
-        begin
-            @result_tracker.add_result(Integer(result_id),result_status)
-        rescue
-            sleep 1
-            @result_tracker.add_result(Integer(result_id),result_status)
+        log_result=proc do
+            begin
+                @result_tracker.add_result(Integer(result_id),result_status)
+            rescue
+                sleep 1
+                @result_tracker.add_result(Integer(result_id),result_status)
+            end
         end
+        callback=proc do nil end
+        EM.defer(log_result,callback)
     end
 
     # Only comes from fuzzclients.
