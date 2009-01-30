@@ -32,7 +32,7 @@ module Producer
             ole=Ole::Storage.open('c:\share\boof.doc','rb')
             table_stream=ole.file.read("1Table")
             ole.close
-            fib.groups[:ol][15..-1].each {|fc,lcb|
+            fib.groups[:ol][50..-1].each {|fc,lcb|
                 next if fib.send(lcb)==0
                 #get the head, fuzztarget and rest from the table stream
                 puts "Starting #{fc.to_s}, #{lcb.to_s}, #{fib.send(lcb)}"
