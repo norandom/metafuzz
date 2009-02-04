@@ -155,9 +155,8 @@ module FuzzClient
             # -c  - initial command
             # sxe -c "r;g" av - run the command 'r;g' whenever an av is hit (including first chance) 
             # -hd don't use the debug heap
-            # -sflags 0x4000 - search public symbols only (suppresses errors for Word which has no symbols for most dlls)
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
-            # -x ignore first chance exceptions
+            # -x ignore first chance av exceptions
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;g\\\" av;g\" -hd -x -xi ld -p #{current_pid}")
             begin
