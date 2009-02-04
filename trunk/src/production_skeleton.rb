@@ -19,7 +19,7 @@ default_config={"AGENT NAME"=>"PRODCLIENT1",
     "FUZZCODE FILE"=>'word_dggfuzz.rb'
 }
 
-
+# foo
 config_file=ARGV[0]
 if config_file and not File.exists? config_file
     puts "ProductionClient: Bad config file #{config_file}, using default config."
