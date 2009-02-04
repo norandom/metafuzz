@@ -176,7 +176,6 @@ module FuzzServer
     end
 
     def handle_client_startup( msg )
-        p msg
         case msg.client_type
         when :fuzz
             @result_tracker.add_fuzz_client
