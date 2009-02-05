@@ -55,7 +55,13 @@ class Fuzzer
 
     def count_tests(overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1)
         num_tests=0
+        begin
         self.basic_tests(overflow_maxlen, send_unfixed, fuzzlevel) {|t| num_tests+=1}
+        rescue
+            puts num_tests
+            raise RuntimeError, "Count: An error. #{$!}"
+            exit
+        end
         num_tests
     end
 
@@ -78,8 +84,9 @@ class Fuzzer
             # Test 1 - Enumerate possible values for this field. Uses the fuction replace_field in the Mutations module
             # to decide what to replace the field with - see that module for the defaults. It should be possible to add all
             # the custom fuzzing code to Mutations, not here.
+            puts "Starting new field"
             val=current_field.get_value
-            replace_field(current_field, overflow_maxlen, fuzzlevel) do |value| 
+            replace_field(current_field, overflow_maxlen, fuzzlevel, @preserve_length) do |value| 
                 begin
                     if current_field.length_type=="fixed" 
                         # best to set it using raw binary to avoid signedness issues etc
@@ -92,13 +99,22 @@ class Fuzzer
                     next
                 end
                 if @preserve_length
-                    raise RuntimeError, "Fuzzer: Length Mismatch when @preserve_length set!" unless tempstruct.to_s.length == @binstruct.to_s.length
+                    unless @binstruct.to_s.length == @check.to_s.length
+                        puts "#{@binstruct.to_s.length} vs #{@check.to_s.length}"
+                        puts current_field.inspect
+                        puts current_field.bitstring.length
+                        puts current_field.get_value.length
+                        puts val.length
+                        raise RuntimeError, "Fuzzer: Length Mismatch when @preserve_length set!" 
+                    end
                 end
                 yield @binstruct if send_unfixed || @fixups==nil
                 yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
             end
+            #puts "Done with replace"
             current_field.set_value(val)
             raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
+            #puts "Check passed."
 
             # Test 2 - Delete the field and send the packet unless @preserve_length is set
             idx=@binstruct.fields.index(current_field)
@@ -106,8 +122,10 @@ class Fuzzer
                 @binstruct.fields.delete current_field
                 yield @binstruct if send_unfixed || @fixups==nil
                 yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                @binstruct.fields.insert(idx, current_field)
+            else
+                #puts "Skipping delete"
             end
-            @binstruct.fields.insert(idx, current_field)
             raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
 
 
@@ -138,6 +156,8 @@ class Fuzzer
                         raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
                     end
                 end
+            else
+                #puts "Skipping Insert"
             end
         end
     end	# basic_tests

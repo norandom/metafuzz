@@ -2,24 +2,19 @@ require 'rubygems'
 require 'eventmachine'
 require 'em_netstring'
 require 'fuzzprotocol'
-require 'connector'
-require 'conn_office'
-require 'conn_cdb'
 require 'diff/lcs'
 require 'fileutils'
-require 'win32/registry'
 
 default_config={"AGENT NAME"=>"PRODCLIENT1",
     "SERVER IP"=>"127.0.0.1",
     "SERVER PORT"=>10001,
-    "WORK DIR"=>'C:\prodclient',
-    "CONFIG DIR"=>'C:\prodclient',
+    "WORK DIR"=>File.expand_path('~/prodclient'),
+    "CONFIG DIR"=>File.expand_path('~/prodclient'),
     "POLL INTERVAL"=>5,
     "SEND DIFFS"=>false,
     "FUZZCODE FILE"=>'word_dggfuzz.rb'
 }
 
-# foo
 config_file=ARGV[0]
 if config_file and not File.exists? config_file
     puts "ProductionClient: Bad config file #{config_file}, using default config."
@@ -80,7 +75,7 @@ at_exit {
     end
     print "Done. Exiting.\n"
 }
-
+Config=config
 require config["FUZZCODE FILE"]
 
 module ProductionClient
@@ -174,7 +169,7 @@ module ProductionClient
         @config=config
         @server_ready=false
         # The Producer module must be defined in the FUZZCODE FILE param of the config
-        @production_generator=Generator.new {|g| Producer.each_item {|i| g.yield i}}
+        @production_generator=Producer.new
         @idtracker=[]
         @case_id=0
         @handler=NetStringTokenizer.new

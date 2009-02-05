@@ -1,19 +1,38 @@
-require 'generator'
-require 'objhax'
-
-#Generators that can be used to create output for various purposes.
-#The Fuzzer object already contains tweakable constants that will create simple generators for basic elements like
-#signed and unsigned fields, strings and the like, but you can create new fields and define your own generators for
-#more complex elements like ASN.1, URLs, email fields, HTML elements or whatever. The individual generators are
-#documented under the class definitions. The generators inherit from the Generator class, so they support <tt>next?, next, 
-#index, current</tt> etc.
-#
-# ---
-# Author: Ben Nagy
-# Copyright: Copyright (c) Ben Nagy, 2006.
-# License: All components of this framework are licensed under the Common Public License 1.0. 
-# Please read LICENSE.TXT for details. Or see RDoc for the file license.rb
 module Generators
+    class NewGen
+
+        def initialize (*args)
+            @args=args
+            @alive=true
+            @cache=@block.resume
+        end
+
+        def next?
+            @alive
+        end
+
+        def next
+            @current=@cache
+            begin
+                @cache=@block.resume
+            rescue FiberError
+                @cache=false
+            end
+            @alive=false unless @cache
+            @current
+        end
+
+        def to_a
+            a=[]
+            a << self.next while self.next?
+            a
+        end
+
+        def rewind
+            initialize(*@args)
+            true
+        end
+    end
 
     #In: Series, Start, Step, Limit, [Transform1, [...] TransformN]
     # 
@@ -57,56 +76,35 @@ module Generators
     # => ["\252", "j\302", "\264\231C", "\245\303\334\314", "\351\230R\207K", 
     #      "\343;\356b\201\t", "\204\212sR\027$\344", "B\274~8\2128G\242", 
     #      "/9,<*\365}\023q", "u\212\3129\241X\267Ao\246"]
-    class Repeater < Generator
+    class Repeater < NewGen
 
-        def initialize(series, start, step, limit, *transforms)
-
-            @series=series
+        def initialize(series,start,step,limit,*transforms)
+            @series,@start,@step,@limit=series,start,step,limit
             @transforms=transforms
-            @start,@step,@limit=start,step,limit
-
-            unless @series.kind_of? Generator
-                items=Array(@series)
+            if @series.respond_to? :each
+                @repeatables=@series
             else
-                items=@series
+                @repeatables=Array(@series)
             end
-
-            results=[]
-            repeats=[@start]
-            while repeats.last < @limit
-                if @step==0
-                    repeats << repeats.first + 2**(repeats.length)+1
-                else
-                    repeats << repeats.last + @step
-                end
-            end
-            repeats.shift if repeats.first==0
-            if repeats.last > @limit
-                repeats.pop; repeats.push @limit
-            end
-            @block=proc {|g|
-                items.each {|item|
-                    repeats.map {|e| Array.new(e, item)}.each {|r|
-                        # run procs on array to be yielded
-                        g.yield(transforms.inject(r) {|r, xform|
-                            xform.call(r)
-                        })
-                    }
+            @block=Fiber.new do
+                @repeatables.each {|r|
+                    if @step==0 # exponential step + startval
+                        a=(1..10000000000).step # slightly lame way of doing it, but short
+                        while (i=@start+(2**(a.next)+1)) < @limit
+                            Fiber.yield(@transforms.inject(Array.new(i,r)) {|v,p| v=p.call(v)})
+                        end
+                        Fiber.yield(@transforms.inject(Array.new(@limit,r)) {|v,p| v=p.call(v)})
+                    else
+                        (@start...@limit).step(@step) {|i|
+                            next if i==0
+                            Fiber.yield(@transforms.inject(Array.new(i,r)) {|v,p| v=p.call(v)})
+                        }
+                        Fiber.yield(@transforms.inject(Array.new(@limit,r)) {|v,p| v=p.call(v)})
+                    end
                 }
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
-            end 
-            self 
-        end
-
-        #Reset generator to original state.
-        def rewind()
-            initialize(@series, @start, @step, @limit, *@transforms) if @index.nonzero?
+                nil
+            end
+            super
         end
     end
 
@@ -138,7 +136,7 @@ module Generators
     # [etc]
     #Note: The cartesian product function is quite forgiving
     #and will take Generators, Ranges and Arrays (at least)
-    class Cartesian < Generator
+    class Cartesian < NewGen
 
         def cartprod(base, *others) #:nodoc:
             if block_given?
@@ -161,22 +159,13 @@ module Generators
 
         def initialize (*series)
             @series=series
-            @block=proc {|g|
+            @block=Fiber.new do
                 cartprod(*series).each {|elem|
-                    g.yield elem
+                    Fiber.yield elem
                 }
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
-            end 
-        end
-
-        def rewind()
-            initialize(*@series) if @index.nonzero?
+                nil
+            end
+            super 
         end
     end
 
@@ -194,12 +183,11 @@ module Generators
     #  "0111111111111111", "1111111111111110", "1100000000000000", "0000000000000011", 
     #  "0011111111111111", "1111111111111100", "1110000000000000", "0000000000000111", 
     #  "0001111111111111", "1111111111111000", "1010101010101010", "0101010101010101"]
-    class BinaryCornerCases < Generator
+    class BinaryCornerCases < NewGen
 
 
         def initialize (bitlength)
             @bitlength=bitlength
-
             cases=[]
             # full and empty
             cases << ('1'*bitlength).to_i(2)
@@ -226,83 +214,13 @@ module Generators
             cases << ('1'*bitlength).gsub(/11/,"10").to_i(2)
             cases << ('0'*bitlength).gsub(/00/,"01").to_i(2)
 
-            @block=proc {|g|
+            @block=Fiber.new do
                 # The call to uniq avoids repeated elements
                 # when bitlength < 4
-                cases.uniq.each {|c| g.yield c}
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
+                cases.uniq.each {|c| Fiber.yield c}
+                nil
             end 
-        end
-
-        def rewind()
-            initialize(@bitlength) if @index.nonzero?
-        end
-
-    end
-
-    #In: Value, Limit, Transform1, ... TransformN
-    #
-    #Out: Value, passed through each Transform in order
-    #	
-    #Although named Static, this generator can be passed
-    #Proc objects that refer to variables in the appropriate namespace, which
-    #can allow the output to change. If you update a
-    #variable that affects a Proc you will need to make
-    #one call to <tt>next</tt> to clear the last queue entry
-    #before the output stream changes. Proc objects that make internal calls to <tt>Kernel::rand</tt>
-    #will also produce a variable output stream.
-    #
-    #The Generator will run out after Limit calls, or never
-    #if Limit is specified as -1.
-    #
-    #WARNING: Don't pass one of these to the Cartesian
-    #generator with a limit of -1 or you'll get an infinite loop.
-    #
-    #Example:
-    # g=Generators::Static.new("angry gibbon", 5, proc {|s| OpenSSL::Digest::MD5.new( s + rand(256).chr ) } )
-    # g.to_a
-    # => [e2fc714c4727ee9395f324cd2e7f331f, 68774090e020b81d2bd584298a8cd612, 
-    #     971f3cbaa55fa9f7290effc88b42b39b, dcc4a4d1992c0cd595454eb34b74e761, 
-    #     a7aef58ed131b9ebf095d608d57529d9]
-    class Static < Generator
-
-
-        def initialize (val, limit, *transforms)
-            @val=val
-            @limit=limit
-            @transforms=transforms
-            @block=proc {|g|
-                if limit==-1
-                    loop do
-                        g.yield(transforms.inject(Marshal.load(Marshal.dump(@val))) {|val, proc|
-                            val=proc.call(val)
-                        })
-                    end
-                else
-                    for i in (1..limit)
-                        g.yield(transforms.inject(Marshal.load(Marshal.dump(@val))) {|val, proc|
-                            val=proc.call(val)
-                        })
-                    end
-                end
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
-            end 
-        end
-
-        def rewind()
-            initialize(@val, @limit, *@transforms) if @index.nonzero?
+            super
         end
     end
 
@@ -311,50 +229,36 @@ module Generators
     # You could also do this by passing g1.to_a+g2.to_a
     # to the Repeater, but this is cleaner and uses lazier
     # evaluation.
-    class Chain < Generator
+    class Chain < NewGen
         def initialize ( *generators )
             @generators=generators
-            @block=proc {|g|
-                generators.each {|gen|
+            @block=Fiber.new do
+                @generators.each {|gen|
                     while gen.next?
-                        g.yield gen.next
+                        Fiber.yield gen.next
                     end
                 }
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
+                false
             end 
+            super
         end
 
-        def rewind()
+        def rewind
             @generators.each {|g| g.rewind}
-            initialize(*@generators) if @index.nonzero?
+            super
         end
     end
 
-    class Rand < Generator
+    class Rand < NewGen
         def initialize ( bitlength, count )
             @bitlength, @count=bitlength, count
-            @block=proc {|g|
+            @block=Fiber.new do
                 @count.times do
-                    g.yield(rand(2**bitlength))
+                    Fiber.yield(rand(2**@bitlength))
                 end
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
+                false
             end 
-        end
-
-        def rewind()
-            initialize(@bitlength, @count) if @index.nonzero?
+            super
         end
     end
     # Parameters: String, Bitlength, Stepsize,Random Cases=0
@@ -365,12 +269,12 @@ module Generators
     # will be unpacked to binary, corrupted at the binary level and then repacked.
     # If an integer is specified for the Random Cases parameter then the generator will also add that number
     # of random binary strings to the corruption
-    class RollingCorrupt < Generator
+    class RollingCorrupt < NewGen
         def initialize(str, bitlength, stepsize,random_cases=0)
             @str,@bitlength,@stepsize,@random_cases=str,bitlength,stepsize,random_cases
             @binstr=str.unpack('B*').first
             raise RuntimeError, "Generators::RollingCorrupt: internal bitstring conversion broken?" unless @binstr.length==(@str.length*8)
-            @block=proc {|g|
+            @block=Fiber.new do 
                 gBin=Generators::BinaryCornerCases.new(bitlength)
                 if random_cases > 0
                     gRand=Generators::Rand.new(bitlength, random_cases)
@@ -381,6 +285,7 @@ module Generators
                 rng=Range.new(0, @binstr.length-1)
                 rng.step(stepsize) {|idx|
                     gFinal.rewind
+                    # Add / Subtract 1,3,5,7,9 from the value that was there
                     [1,3,5,9].each {|num|
                         out_str=@binstr.clone
                         to_change=out_str[idx..idx+(bitlength-1)]
@@ -388,39 +293,31 @@ module Generators
                         out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
                         out_str=[out_str[0..@binstr.length-1]].pack('B*')
                         raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
-                        g.yield out_str
+                        Fiber.yield out_str
                         out_str=@binstr.clone
                         to_change=out_str[idx..idx+(bitlength-1)]
                         changed="%.#{bitlength}b" % (to_change.to_i(2) - num)
                         out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
                         out_str=[out_str[0..@binstr.length-1]].pack('B*')
                         raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
-                        g.yield out_str
+                        Fiber.yield out_str
                     }
                     while gFinal.next?
                         out_str=@binstr.clone
                         out_str[idx..idx+(bitlength-1)] = "%.#{bitlength}b" % gFinal.next
                         out_str=[out_str[0..@binstr.length-1]].pack('B*')
                         raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
-                        g.yield out_str
+                        Fiber.yield out_str
                     end
                 }
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
+                nil
             end 
+            super
         end
 
-        def rewind()
-            initialize(@str,@bitlength,@stepsize) if @index.nonzero?
-        end
     end
 
-    class Chop < Generator
+    class Chop < NewGen
         def remove_middle_third( instr )
             len=instr.length
             return instr if len < 3
@@ -438,25 +335,82 @@ module Generators
 
         def initialize(str)
             @str=str
-            @block=proc {|g|
+            @block=Fiber.new do |g|
                 while str.length >= 3
                     str=remove_middle_third(str)
-                    g.yield str
+                    Fiber.yield str
                 end
-            }
-            @index = 0 
-            @queue = [] 
-            @cont_next = @cont_yield = @cont_endp = nil 
-            if @cont_next = callcc { |c| c } 
-                @block.call(self) 
-                @cont_endp.call(nil) if @cont_endp 
+                nil
             end 
-        end
-
-        def rewind()
-            initialize(@str) if @index.nonzero?
+            super
         end
     end
 
+    class Static < NewGen
 
+        def initialize (*args)
+            @val=args[0]
+            @limit=args[1]
+            @transforms=args[2..-1]
+            @block=Fiber.new do
+                if @limit==-1
+                    loop do
+                        Fiber.yield(@transforms.inject(Marshal.load(Marshal.dump(@val))) {|val, proc|
+                            val=proc.call(val)
+                        })
+                    end
+                else
+                    for i in (1..@limit)
+                        Fiber.yield(@transforms.inject(Marshal.load(Marshal.dump(@val))) {|val, proc|
+                            val=proc.call(val)
+                        })
+                    end
+                end
+                nil
+            end
+            super
+        end
+
+    end
+end
+
+if __FILE__==$0
+    puts "Starting tests..."
+    include Generators
+    puts "Static..."
+    g=Static.new("dog",4,proc do |s| s.upcase end,proc do |s| s.reverse end)
+    while g.next?
+        puts g.next
+    end
+    g.rewind
+    puts g.next.downcase.reverse
+    puts "Repeater..."
+    g=Repeater.new(['a','b'],0,0,100,proc do |a| a.join.upcase end,proc do |s| s.tr('AEIOU','Q') end)
+    while g.next?
+        puts g.next
+    end
+    g.rewind
+    puts g.next
+    puts "Cartesian..."
+    g=Generators::Cartesian.new( ('a'..'c'), [1,2], %w( monkey hat ) )
+    while g.next?
+        foo, bar, baz=g.next
+        puts "#{foo} : #{bar} -- #{baz}"
+    end
+    puts "Binary Corner..."
+    g=Generators::BinaryCornerCases.new(16)
+    puts g.to_a.map {|c| "%.16b" % c}
+    puts "Chain"
+    g1=Generators::BinaryCornerCases.new(16)
+    g2=Generators::BinaryCornerCases.new(8)
+    chain=Generators::Chain.new(g1,g2)
+    p chain
+    p chain.to_a
+    puts "Binary Corrupt..."
+    g=Generators::RollingCorrupt.new("aaaaaaaa",16,16,0)
+    while g.next?
+        p g.next
+    end
+    g.rewind
+    puts g.to_a.length
 end
