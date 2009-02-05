@@ -158,7 +158,7 @@ class BinStruct
     #With a buffer, parse the buffer according to the field definitions. Without a buffer, create a new
     #structure with all fields set to 0, '' or the default value.
     def initialize(buffer=nil)
-        bitstring=buffer.unpack('B*').to_s unless buffer.nil?
+        bitstring=buffer.unpack('B*').join unless buffer.nil?
         @children=[]
         @fields||=[]
         @parent=nil
@@ -176,7 +176,7 @@ class BinStruct
                     else
                         #parse as string tokens, using the separator
                         @tokens||=buffer.split(separator)
-                        current_field=field_class.new((@tokens.shift.unpack('B*').to_s rescue ''), name, (eval String(length)), desc, default,@endianness)
+                        current_field=field_class.new((@tokens.shift.unpack('B*').join rescue ''), name, (eval String(length)), desc, default,@endianness)
                     end
                 else # We're creating a default struct.
                     current_field=field_class.new('', name, (eval String(length)), desc, default,@endianness)
@@ -266,14 +266,14 @@ class BinStruct
         }
         # empty separators vanish here
         bits=separated_fields.inject("") {|str,field| 
-            field.kind_of?(Fields::Field) ?  str << field.bitstring : str << field.to_s.unpack('B*').to_s
+            field.kind_of?(Fields::Field) ?  str << field.bitstring : str << field.to_s.unpack('B*').join
         } 
         unless bits.length % 8 == 0
             puts "Warning, structure not byte aligned, right padding with 0"
         end
         bytearray=bits.scan(/.{1,8}/)
         bytearray << '0'*(8-bytearray.last.length) if bytearray.last.length < 8
-        bytearray.map {|byte| "" << byte.to_i(2)}.join + @children.to_s
+        bytearray.map {|byte| "" << byte.to_i(2)}.join + @children.join
     end
 
     #Recursively run &block on this structure and every child within it.

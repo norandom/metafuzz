@@ -280,7 +280,7 @@ module Fields
       unless value.respond_to? :to_str 
         raise ArgumentError, "StringField(#{@name}): Input value not a string."
       end
-      value.to_str.unpack('B*').to_s
+      value.to_str.unpack('B*').join
     end
 
     def get_value
@@ -308,5 +308,5 @@ module Fields
     end
   end #BitstringField
 
-  Field_Subtypes=self.constants.map {|const| const.sub(/Field/,'').downcase.to_sym if const=~/^.+Field/}.compact
+  Field_Subtypes=self.constants.map {|const| const.to_s.sub(/Field/,'').downcase.to_sym if const=~/^.+Field/}.compact
 end # Fields

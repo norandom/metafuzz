@@ -65,8 +65,7 @@ module Mutations
 	# new blocks to the hash when they have types that need complicated fuzzing, eg ASN.1,
 	# compressed chunks and the like.
 	Replacement_Generators={} #:nodoc:
-	Replacement_Generators.default=Proc.new{|field, maxlen|
-		@preserve_length=true
+	Replacement_Generators.default=Proc.new{|field, maxlen, preserve_length|
 		if field.length_type=="fixed" or maxlen==0
 			# for fields > 8 bits, just test the corner cases
 			if field.length > 8
@@ -79,7 +78,11 @@ module Mutations
 			rc1=Generators::RollingCorrupt.new(field.get_value,13,3,32)
 			rc2=Generators::RollingCorrupt.new(field.get_value,16,16,32)
 			chopper=Generators::Chop.new(field.get_value)
-			g=Generators::Chain.new(rc1,rc2,rep,chopper)
+                        if preserve_length
+                            g=Generators::Chain.new(rc1,rc2)
+                        else
+                            g=Generators::Chain.new(rc1,rc2,rep,chopper)
+                        end
 		else
 			raise RuntimeError, "Mutations::replace_field: Unknown length type #{field.length_type}"
 		end
@@ -88,11 +91,11 @@ module Mutations
 	#
 	#Looks up the field.type as a string in a Replacement_Generators hash, so users can expand the repetoire of
 	#generators by creating custom field types that require particular fuzzing approaches.
-	def replace_field(field, maxlen, fuzzlevel) #:yields:replacement_data
+	def replace_field(field, maxlen, fuzzlevel, preserve_length) #:yields:replacement_data
 		#grab a generator
-		g=Replacement_Generators[field.type].call(field, maxlen)
+		g=Replacement_Generators[field.type].call(field, maxlen, preserve_length)
 		while g.next?
-			yield g.next
+                    yield g.next
 		end 
                 g=nil
 	end #replace_field
