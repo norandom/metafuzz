@@ -134,8 +134,8 @@ module FuzzServer
 
 
     def handle_result( msg )
-        result_id,result_status,data=msg.id, msg.status, msg.data
-        puts data unless data.empty? # testing, testing...
+        result_id,result_status,crashdata=msg.id, msg.status, msg.data
+        puts crashdata unless crashdata.empty? # testing, testing...
         log_result=proc do
             begin
                 @result_tracker.add_result(Integer(result_id),result_status)
