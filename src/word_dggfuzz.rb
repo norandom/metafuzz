@@ -14,6 +14,8 @@ require 'generators'
 
 class Producer < Generators::NewGen
 
+    START_AT=190000
+
     Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
@@ -95,6 +97,7 @@ class Producer < Generators::NewGen
             end
             false
         end
+        START_AT.times do @block.resume end
         super
     end
 
