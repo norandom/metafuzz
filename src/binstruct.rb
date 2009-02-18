@@ -125,7 +125,7 @@ class BinStruct
     end
 
     #Link sets of fields, such as type, length, value sets or length, data pairs. This
-    #will create metadata that the Fuzzer can use to create nastier output. (When it is actually implemented, that is...)
+    #will create metadata that the Fuzzer can use to create nastier output.
     def self.group(sym, *other_syms)
         @grouped_fields||=Hash.new {|h,k| h[k]=[]}
         @grouped_fields[sym] << other_syms
