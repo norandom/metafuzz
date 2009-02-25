@@ -32,23 +32,17 @@ module Mutations
 	# The overflow elements for strings are four sets of strings of random selections from 
 	# {/^*.[]$+@?1234()\'`} (regexp)  rand(256) (junk) and {%x%s%n} (format string) and {'p'} (ASCII).
 	# This hash is for the injected elements, not the replacement elements.
-	injection_default=Proc.new{|maxlen, sepstring| 
-		gJunk=create_string_generator(Array((0..255)).map {|e| "" << e},maxlen)
-		gSep=create_string_generator([sepstring],maxlen)
-		gFinal=gJunk
-		gFinal=Generators::Chain.new(gFinal,gSep) unless sepstring==""
-		gFinal
+	injection_default=Proc.new{|maxlen| 
+		create_string_generator(Array((0..255)).map {|e| "" << e},maxlen)
 	}
 	Injection_Generators=Hash.new(injection_default) #:nodoc:
-	Injection_Generators["string"]=Proc.new {|maxlen, sepstring|
+	Injection_Generators["string"]=Proc.new {|maxlen|
 		gJunk=create_string_generator(Array((0..255)).map {|e| "" << e},maxlen)
 		gLetters=create_string_generator(['p'],maxlen)
 		gRegexp=create_string_generator(%w(/ ^ * . [ ] $ + @ ? 1 2 3 4 ( ) \\ ` '),maxlen)
 		gFormat=create_string_generator(%w(%s %n %x),maxlen)
 		gTokens=create_string_generator([' ',"\t","\n",':',';',','],maxlen)
-		gSep=create_string_generator([sepstring],maxlen)
 		gFinal=Generators::Chain.new(gLetters,gFormat,gTokens,gRegexp,gJunk)
-		gFinal=Generators::Chain.new(gFinal,gSep) unless sepstring==""
 		gFinal
 	}
 	# This hash is for the blocks that will create generators for field replacement generators.
@@ -69,18 +63,22 @@ module Mutations
 		if field.length_type=="fixed" or maxlen==0
 			# for fields > 8 bits, just test the corner cases
 			if field.length > 8
-				g=Generators::BinaryCornerCases.new(field.length)
+                                # We're actually using RollingCorrupt, which was designed for strings, because it gives
+                                # us the ability to add random cases and also it adds and subtracts 1,3,5,7,9 from the initial
+                                # value, as well as doing the binary corner cases.   
+                                g=Generators::RollingCorrupt.new(field.to_s,field.bitstring.length,field.bitstring.length,32)
 			else # enumerate fully
-				g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.first})
+                                # Must return a String, hence the pack fixup.
+				g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.pack('C')})
 			end
 		elsif field.length_type=="variable"
-			rep=Generators::Repeater.new(field.get_value,0,0,maxlen,proc {|a| a.to_s})
-			rc1=Generators::RollingCorrupt.new(field.get_value,13,3,32)
-			rc2=Generators::RollingCorrupt.new(field.get_value,16,16,32)
-			chopper=Generators::Chop.new(field.get_value)
+			rc1=Generators::RollingCorrupt.new(field.to_s,13,3,32)
+			rc2=Generators::RollingCorrupt.new(field.to_s,16,16,32)
                         if preserve_length
                             g=Generators::Chain.new(rc1,rc2)
                         else
+                            chopper=Generators::Chop.new(field.to_s)
+                            rep=Generators::Repeater.new(field.to_s,0,0,maxlen,proc {|a| a.to_s})
                             g=Generators::Chain.new(rc1,rc2,rep,chopper)
                         end
 		else
@@ -108,7 +106,7 @@ module Mutations
 	#for the structure (if any) is also passed as a parameter, and will be expanded during the fuzzing process.
 	def inject_data(field, maxlen, fuzzlevel) #:yields:data_to_inject
 		#grab a generator
-		g=Injection_Generators[field.type].call(maxlen, @binstruct.separator)
+		g=Injection_Generators[field.type].call(maxlen)
 		while g.next?
 			yield g.next
 		end

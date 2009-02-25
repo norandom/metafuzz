@@ -53,10 +53,10 @@ class Fuzzer
         @check=@binstruct.to_s
     end
 
-    def count_tests(overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1)
+    def count_tests(overflow_maxlen=5000, send_unfixed=true, skip=0, fuzzlevel=1)
         num_tests=0
         begin
-        self.basic_tests(overflow_maxlen, send_unfixed, fuzzlevel) {|t| num_tests+=1}
+            self.basic_tests(overflow_maxlen, send_unfixed, skip, fuzzlevel) {|t| num_tests+=1}
         rescue
             puts num_tests
             raise RuntimeError, "Count: An error. #{$!}"
@@ -77,23 +77,22 @@ class Fuzzer
     #Example:
     # f=Fuzzer.new(ExampleStruct.new)
     # f.basic_tests("corner", 1500, false) {|pkt| some_socket.send(pkt,0)} 
-    def basic_tests( overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1 ) #:yields:fuzzed_item
+    def basic_tests( overflow_maxlen=5000, send_unfixed=true, skip=0, fuzzlevel=1 ) #:yields:fuzzed_item
 
-        @binstruct.fields.each do |current_field| # remember that it's possible for current_field to be not a Fields::Field
+        count=0
+        if skip > 0
+            puts "Skipping #{skip} tests."
+        end
+        fuzzblock=proc do |current_field| # remember that it's possible for current_field to be not a Fields::Field
 
             # Test 1 - Enumerate possible values for this field. Uses the fuction replace_field in the Mutations module
             # to decide what to replace the field with - see that module for the defaults. It should be possible to add all
             # the custom fuzzing code to Mutations, not here.
-            puts "Starting new field"
             val=current_field.get_value
             replace_field(current_field, overflow_maxlen, fuzzlevel, @preserve_length) do |value| 
                 begin
-                    if current_field.length_type=="fixed" 
-                        # best to set it using raw binary to avoid signedness issues etc
-                        current_field.set_raw value.to_s(2)
-                    else
-                        current_field.set_value value
-                    end
+                    # best to set it using raw binary to avoid signedness issues etc
+                    current_field.set_raw value.unpack('B*').join
                 rescue ArgumentError, NoMethodError
                     # most likely was not a Fields::Field
                     next
@@ -108,57 +107,102 @@ class Fuzzer
                         raise RuntimeError, "Fuzzer: Length Mismatch when @preserve_length set!" 
                     end
                 end
-                yield @binstruct if send_unfixed || @fixups==nil
-                yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                if send_unfixed || @fixups.empty?
+                    if count >= skip
+                        yield @binstruct 
+                    end
+                    count+=1
+                end
+                unless @fixups.empty?
+                    if count >= skip
+                        yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                    end
+                    count+=1
+                end
             end
-            #puts "Done with replace"
             current_field.set_value(val)
             raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
             #puts "Check passed."
 
             # Test 2 - Delete the field and send the packet unless @preserve_length is set
-            idx=@binstruct.fields.index(current_field)
+            nulfield=BinStruct.new 
             unless @preserve_length
-                @binstruct.fields.delete current_field
-                yield @binstruct if send_unfixed || @fixups==nil
-                yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
-                @binstruct.fields.insert(idx, current_field)
+                @binstruct.replace(current_field, nulfield)
+                if send_unfixed || @fixups.empty?
+                    if count >= skip
+                        yield @binstruct 
+                    end
+                    count+=1
+                end
+                unless @fixups.empty?
+                    if count >= skip
+                        yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                    end
+                    count+=1
+                end
+                @binstruct.replace(nulfield,current_field)
             else
                 #puts "Skipping delete"
             end
             raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
 
-
             # Test 3 - Insert overflow chunks of varying lengths before the field
             # unless @preserve_length is set
             # Uses the inject_data function from the Mutations module to decide what to inject.
-            # Creates a BitstringField to contain
+            # Creates a StringField to contain
             # the overflow chunk data so that things that iterate over the field array expecting
             # Fields::Field types will not break (even if things will be in the wrong order
             # sometimes)
             unless @preserve_length
-                inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
-                    inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,@binstruct.endianness)
-                    @binstruct.fields.insert(@binstruct.fields.index(current_field),inject_field)
-                    yield @binstruct if send_unfixed || @fixups==nil
-                    yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
-                    @binstruct.fields.delete(inject_field)
-                    raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
-                end
-                # if this is the last field, dump the chunks afterwards as well.
-                if current_field==@binstruct.fields.last
+                # if this is the first field, dump the chunks before.
+                if current_field==@binstruct.flatten.first
                     inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
-                        inject_field=Fields::BitstringField.new(chunk.unpack('B*').join,'injected',chunk.length*8,"This field was injected",nil,@binstruct.endianness)
-                        @binstruct.fields << inject_field 
-                        yield @binstruct if send_unfixed || @fixups==nil
-                        yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
-                        @binstruct.fields.delete(inject_field)
+                        chunk=(chunk+current_field.to_s).unpack('B*').join
+                        inject_field=Fields::StringField.new(chunk,'injected',chunk.length*8,"injected by fuzzer",nil,@binstruct.endianness)
+                        @binstruct.replace(current_field, inject_field)
+                        if send_unfixed || @fixups.empty?
+                            if count >= skip
+                                yield @binstruct 
+                            end
+                            count+=1
+                        end
+                        unless @fixups.empty?
+                            if count >= skip
+                                yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                            end
+                            count+=1
+                        end
+                        @binstruct.replace(inject_field, current_field)
                         raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
                     end
+                end
+                inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
+                    chunk=(current_field.to_s+chunk).unpack('B*').join
+                    inject_field=Fields::StringField.new(chunk,'injected',chunk.length*8,"injected by fuzzer",nil,@binstruct.endianness)
+                    @binstruct.replace(current_field,inject_field)
+                    if send_unfixed || @fixups.empty?
+                        if count >= skip
+                            yield @binstruct 
+                        end
+                        count+=1
+                    end
+                    unless @fixups.empty?
+                        if count >= skip
+                            yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                        end
+                        count+=1
+                    end
+                    @binstruct.replace(inject_field, current_field)
+                    raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
                 end
             else
                 #puts "Skipping Insert"
             end
+        end
+        if @binstruct.respond_to? :deep_each
+            @binstruct.deep_each &fuzzblock
+        else
+            @binstruct.fields.each &fuzzblock
         end
     end	# basic_tests
 end

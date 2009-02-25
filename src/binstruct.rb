@@ -1,345 +1,201 @@
 require 'fields'
 require 'objhax'
 
-#The BinStruct constructor class is mainly designed for building structures, but at a pinch it can be used
-#as a half-decent parser for both packed binary and tokenised strings.
-#New BinStruct objects are created with an abbreviated syntax. The basic field construction is:
-# fieldtype symbol, length, description, condition (optional)
-#The <tt>length</tt> parameter can be a number, expression or a string containing ruby code that will
-#be evaluated in the namespace of the object being initialized when parsing data. This means that code strings have access
-#to the variables <tt>buffer</tt> for the raw input and <tt>bitstring</tt> for the binary string conversion
-#of the buffer. This allows lengths to be calculated based on fields that have already been set up, the entire <tt>buffer</tt>
-#, (which is never altered) or the remaining
-#contents of the <tt>bitstring</tt> (which is <tt>slice!</tt> ed each time a field is created). One example would be seeking
-#forward to the next null character or other terminator.
-#
-#The optional condition paramter is another code string which is evaluated in the namespace of the object being created. If the condition evaluates
-#to <tt>false</tt> then the field will be skipped. This is useful in some protocols which create different fields as a result of an earlier type field or
-#flag.
-#
-#Other commands can be used once the fields are defined. 
-#At the moment, <tt>default_value</tt>, <tt>randomize</tt> and <tt>separator</tt> are the
-#only supported extra commands.
-#
-#Here is an example structure which is used in the BinStruct specification file:
-# class DataAttrib < BinStruct
-#   unsigned :flag, 1, "Attribute Format Flag"
-#   signed :type, 15, "Attribute Type"
-#   unsigned :length, 16, "Attribute Length", "self.flag==0"
-#   bitstring :flags, 13, "Some Flags"
-#   bitstring :pad, 3, "Random Padding"
-#   hexstring :testhex, 64, "Some hex data"
-#   string :teststr, 32, "Some string data"
-#   octetstring :ipaddr, 32, "IP Address"
-#   string :long_value, "self.length", "Attribute Value", "self.flag==0"
-#   unsigned :short_value, 8*2, "Attribute Value", "self.flag==1"
-#   default_value :type, -23
-#   default_value :long_value, "faff"
-#   default_value :flag, 1
-#   default_value :short_value, 13
-#   default_value :ipaddr, "192.168.13.12"
-# end
-#
-#And here is an example structure which uses the string tokenizer instead of the bitlength parser.
-#Note that you can use any value you like for length if you define a separator, it parses by tokenizing
-#the string (currently using str.split(separator)).
-# class HTTPGet < BinStruct
-#   string :op, 0, "Operation"
-#   string :dir, 0, "Directory"
-#   string :ver, 0, "Version"
-#   
-#   separator ' '
-#   default_value :op, "GET"
-#   default_value :dir, '/'
-#   default_value :ver, "HTTP/1.0"
-# end
-#
-#
-# ---
-# Author: Ben Nagy
-# Copyright: Copyright (c) Ben Nagy, 2006.
-# License: All components of this framework are licensed under the Common Public License 1.0. 
-# Please read LICENSE.TXT for details. Or see RDoc for the file license.rb
 class BinStruct
-    attr_reader :parent, :children, :fields, :separator, :groups, :endianness
-    attr_writer :fields, :separator
 
-    # start BinStruct constructor / "meta" methods
-    class << self
-        attr_reader :parser_commands, :defaults, :friendly_values, :valid_values, :initial_separator_string, :initial_endianness
-        attr_reader :grouped_fields
+    class Bitfield < BinStruct
     end
-
-    def self.new( *args, &blk ) #:nodoc:
-        # default instance variables for the constructed class. DerivedClass.variable)
-        # not object_of_derived_class.variable
-        @defaults||={}
-        @friendly_values||={}
-        @valid_values||={}
-        @parser_commands||=[]
-        @grouped_fields||=Hash.new {|h,k| h[k]=[]}
-        @initial_endianness||="network"
-        super
-    end
-
-    # set up the field constructor methods
-    def self.setup_field_builders(*fieldtypes) #:nodoc:
-        fieldtypes.each {|fieldtype| 
-            meta_def fieldtype do |*args|
-                name, length, desc, condition=args
-                condition||="true"
-                @parser_commands||=[]
-                @parser_commands << [fieldtype.to_s, name, length, desc, condition]
-            end
-        }
-    end
-
-    setup_field_builders *Fields::Field_Subtypes
-
-    #Set default value for fields within a class.
-    def self.default_value(sym, value)
-        @defaults||={}
-        @defaults[sym]=value
-    end
-
-    def self.fields_to_randomize #:nodoc:
-        @fields_to_randomize||=[]
-        @fields_to_randomize
-    end
-
-    #Randomize this field at instantiation (at bit level).
-    def self.randomize( sym )
-        fields_to_randomize << sym
-    end
-
-    # not fully implemented yet
-    def self.friendly_values(sym, hash) 
-        @friendly_values={}
-        @friendly_values[sym]=hash
-    end
-
-    # not fully implemented yet
-    def self.valid_values(sym, hash) 
-        @valid_values={}
-        @valid_values[sym]=hash
-    end
-
-    #Link sets of fields, such as type, length, value sets or length, data pairs. This
-    #will create metadata that the Fuzzer can use to create nastier output.
-    def self.group(sym, *other_syms)
-        @grouped_fields||=Hash.new {|h,k| h[k]=[]}
-        @grouped_fields[sym] << other_syms
-    end
-
-    #Define a separator string that will be used during the <tt>pack</tt> or <tt>to_s</tt> methods
-    #for this structure. The separator will be inserted after every string but the last. The Fuzzer
-    #will also use it by repeating the separator between fields. If a separator is set then calls to
-    #BinStruct#new that have an argument (parser utilisation) will tokenize the string using the 
-    #separator and ignore the length argument.
-    def self.separator( separator_string )
-        @initial_separator_string=String(separator_string)
-    end
-
-    def self.endianness( endianness )
-        unless endianness.downcase=="network" or endianness.downcase=="intel"
-            raise ArgumentError, "Binstruct: Unknown endianness #{endianness}, use 'intel' or 'network' (default)."
+    attr_reader :groups, :endian
+    attr_accessor :fields
+    #---------------CONSTRUCTION-------------------
+    def endian( sym )
+        unless sym==:little || sym==:big
+            raise RuntimeError, "BinStruct: Construction: Unknown endianness #{sym.to_s}"
         end
-        @initial_endianness=String(endianness)
+        @endian=sym
+        meta_def :endian do sym end
+        meta_def :endianness do sym end
     end
 
-    def self.method_missing( meth, *args ) #:nodoc:
-        raise SyntaxError, "BinStruct: Unknown construction command: #{meth}"
-    end
-
-    #end BinStruct constructor methods
-
-    # start BinStruct instance methods
-
-    #With a buffer, parse the buffer according to the field definitions. Without a buffer, create a new
-    #structure with all fields set to 0, '' or the default value.
-    def initialize(buffer=nil)
-        bitstring=buffer.unpack('B*').join unless buffer.nil?
-        @children=[]
-        @fields||=[]
-        @parent=nil
-        @separator=self.class.initial_separator_string || ''
-        @endianness=self.class.initial_endianness
-        @groups=self.class.grouped_fields
-        self.class.parser_commands.each {|fieldtype, name, length, desc, condition|
-            if eval condition
-                default=self.class.defaults[name]
-                field_class=Fields.const_get(fieldtype.capitalize+"Field")
-                unless buffer.nil? # We're now parsing...
-                    if @separator==''
-                        #parse as packed binary
-                        current_field=field_class.new(bitstring.slice!(0,(eval String(length))), name, (eval String(length)), desc, default,@endianness)
-                    else
-                        #parse as string tokens, using the separator
-                        @tokens||=buffer.split(separator)
-                        current_field=field_class.new((@tokens.shift.unpack('B*').join rescue ''), name, (eval String(length)), desc, default,@endianness)
-                    end
-                else # We're creating a default struct.
-                    current_field=field_class.new('', name, (eval String(length)), desc, default,@endianness)
-                    current_field.set_value(default) if default
-                    current_field.randomize! if self.class.fields_to_randomize.any? {|sym| sym==name}
-                end
-                @fields << current_field
-                @hash_references||={}
-                @hash_references[name.to_sym]=current_field
-                # add obj.fieldname and obj.fieldname= singleton methods to the object
-                meta_def name do
-                    current_field.get_value
-                end
-                meta_def (name.to_s+"=").to_sym do |new_val|
-                    current_field.set_value(new_val)
-                end
+    def bitfield(bitbuf, len, &blk)
+        if @endian==:little
+            unless len==16||len==32||len==64
+                raise RuntimeError, "BinStruct: Bitfield: Don't know how to endian swap #{len} bits. :("
             end
+            instr=bitbuf.slice!(0,len).scan(/.{8}/).reverse.join.reverse
+        else
+            instr=bitbuf.slice!(0,len)
+        end
+        new=Bitfield.new([instr].pack('B*'), &blk)
+        if @endian==:little
+            new.instance_variable_set :@endian_flip_hack, true
+        end
+        @fields << new
+        new.fields.each {|f| 
+            unless f.is_a? Fields::Field
+                raise RuntimeError, "BinStruct: Construction: Illegal content #{f.class} in bitfield - use only Fields"
+            end
+            @hash_references[f.name]=f
+            meta_def f.name do f.get_value end
+            meta_def (f.name.to_s + '=').to_sym do |val| f.set_value(val) end
         }
+    end
+
+    def substruct(strbuf, name, len, klass)
+        new=klass.new(strbuf)
+        @fields << new
+        @hash_references[name]=new
+        meta_def name do new end
+        # More informative than the NoMethodError they would normally get.
+        meta_def (name.to_s + '=').to_sym do raise NoMethodError, "BinStruct: Illegal call of '=' on a substruct." end
+    end
+
+    #fieldtype builders
+    Fields::Field_Subtypes.each {|fieldname|
+        field_klass=Fields.const_get(fieldname.capitalize.to_s+"Field")
+        define_method fieldname do |*args|
+            bitbuf, name, len, desc=args
+            @fields << thisfield=field_klass.new(bitbuf.slice!(0,len),name,len,desc,nil,@endian||:big)
+            @hash_references[name.to_sym]=thisfield
+            meta_def name do thisfield.get_value end
+            meta_def (name.to_s + '=').to_sym do |val| thisfield.set_value(val) end
+        end
+    }
+
+    def group( groupname, *fieldsyms )
+        @groups[groupname] << fieldsyms
+    end
+
+    class << self
+        attr_reader :init_block
+    end
+    def self.parse( &blk )
+        @init_block=blk
+    end
+    #------------END CONSTRUCTION------------------
+    def initialize(buffer=nil, &blk)
+        @fields=[]
+        @hash_references={}
+        @endian_flip_hack=false
+        @groups=Hash.new {|h,k| h[k]=[]}
+        buffer||=""
+        @bitbuf=buffer.unpack('B*').join
+        if block_given?
+            instance_exec(@bitbuf, &blk)
+        elsif self.class.init_block
+            instance_exec(@bitbuf, &self.class.init_block)
+        else
+            # do nothing, user probably just wants a blank struct to manually add fields.
+        end
+        endian :big unless @endian
         @groups.each {|group, contents|
-            unless contents.flatten.all? {|sym| @fields.any? {|field| field.name==sym}}
-                raise RuntimeError, "Binstruct: Construction: group #{group} contains invalid field name(s)"
+            unless contents.flatten.all? {|sym| @hash_references.keys.any? {|othersym| othersym==sym}}
+                raise RuntimeError, "BinStruct: Construction: group #{group} contains invalid field name(s)"
             end
         }
-        # Shorten the input buffer to remove what we used. This is a bit spooky for structs that aren't byte aligned
-        # but it's the best way I can think of. Remainders %8 will be packed according to their
-        # integer value (so the leftover string "1111 1111 111" ends up as "\377\007"
-        buffer.replace bitstring.scan(/.{8}/).map {|e| e.to_i(2).chr}.join unless buffer.nil?
+        # This is not ideal for structures that aren't byte aligned, but raising an exception 
+        # would be less flexible.
+        buffer.replace @bitbuf.scan(/.{8}/).map {|e| e.to_i(2).chr}.join unless buffer.nil?
     end
-
-    #Reference a field directly by its symbol, returns the field object. 
-    def []( sym )
+    #----------------INSTANCE----------------------
+    def[]( sym )
+        # return an object, specified by symbol. May be a field or a substruct.
+        # not designed for bitfields, since they're supposed to be invisible
+        # containers.
         @hash_references[sym]
     end
 
-    # Randomize a field. Returns the structure, unlike struct[:fieldname].randomize!
-    # (which it uses internally).
-    def randomize( sym )
-        self[sym].randomize! # So either struct[:field].randomize! or struct.randomize :field will work
-        self #this might be convenient sometimes, hence why there are two ways to do it.
-    end
-
-
-    #Add a child to the current BinStruct. The child must be a kind_of? BinStruct.
-    def add_child( child )
-        # should I allow user to shoot self in foot
-        # by setting @children attr_writer - tree_run will
-        # die etc as would all the length stuff... Let's not.
-        raise ArgumentError, "Child not a BinStruct." unless child.kind_of? BinStruct
-        child.instance_variable_set(:@parent,self)
-        @children << child
-    end
-
-    #Delete a given child from the current BinStruct
-    def remove_child( child )
-        # wonder if I need fancy checking here... Can't see why.
-        @children.delete( child ) && child.instance_variable_set(:@parent,nil)
-    end
-
-    #Boolean
-    def has_children?
-        not @children.empty?
-    end
-
-    #Boolean
-    def has_parent?
-        not @parent.nil?
-    end
-
-    #Length in bytes. Don't know if anyone would need length in
-    #bits, but you could pull it by counting bitstring.length for
-    #each field
-    def length
-        self.to_s.length 
-    end
-
-    #Same as to_s
-    def pack
-        self.to_s
-    end
-
-    #Packs everything up into a string. Will right pad the raw binary with '0' before packing if the structure is not byte aligned for some reason.
-    def to_s
-        # splice in the separators
-        separated_fields=self.fields.inject( [] ) {|arr, elem| 
-            arr.push self.separator unless arr.empty?
-            arr.push elem
+    def each( &blk )
+        # yield each object to the block. This is a little messy, because
+        # substructs are not Fields::Field types. For Bitfields, just silently
+        # yield each component, not the container field. The upshot of all this
+        # is that the caller needs to be prepared for a Field or a BinStruct in the
+        # block. This is the 'shallow' each.
+        @fields.each {|atom|
+            if atom.is_a? Bitfield
+                atom.fields.each {|f| yield f}
+            else
+                yield atom
+            end
         }
-        # empty separators vanish here
-        bits=separated_fields.inject("") {|str,field| 
+
+    end
+
+    def deep_each( &blk )
+        # yield all fields in the structure, entering nested substructs as necessary
+        @fields.each {|atom|
+            if atom.is_a? Bitfield
+                atom.fields.each {|f| yield f}
+            elsif atom.is_a? BinStruct # but not a Bitfield
+                atom.deep_each &blk
+            else
+                yield atom
+            end
+        }
+    end
+
+    def replace(oldthing, newthing)
+        k,v=@hash_references.select {|k,v| v==oldthing}.flatten
+        @hash_references[k]=newthing
+        @fields.map! {|atom|
+            if atom==oldthing
+                newthing
+            else
+                if atom.is_a? BinStruct
+                    atom.replace(oldthing,newthing)
+                end
+                atom
+            end
+        }
+    end
+
+    def flatten
+        a=[]
+        self.deep_each {|f| a << f}
+        a
+    end
+
+    def to_s
+        #pack current struct as a string - for Fields, it will use the bitstring, for
+        #anything else (including Bitfields and BinStructs) it will use to_s.unpack('B*')
+        bits=@fields.inject("") {|str,field| 
             field.kind_of?(Fields::Field) ?  str << field.bitstring : str << field.to_s.unpack('B*').join
         } 
         unless bits.length % 8 == 0
-            puts "Warning, structure not byte aligned, right padding with 0"
+            #puts "Warning, structure not byte aligned, right padding with 0"
         end
+        bits=bits.reverse if @endian_flip_hack
+        return "" if bits.empty?
         bytearray=bits.scan(/.{1,8}/)
-        bytearray << '0'*(8-bytearray.last.length) if bytearray.last.length < 8
-        bytearray.map {|byte| "" << byte.to_i(2)}.join + @children.join
+        bytearray.last << '0'*(8-bytearray.last.length) if bytearray.last.length < 8
+        bytearray=bytearray.reverse if @endian_flip_hack
+        bytearray.map {|byte| "" << byte.to_i(2)}.join
     end
 
-    #Recursively run &block on this structure and every child within it.
-    def tree_run( depth=0, &block)
-        block.call(self, depth)
-        @children.each {|child| child.tree_run(depth+1, &block)}
+    def length
+        self.to_s.length
     end
+end
 
-    #Will dump the field description / field value pairs, although it's not very pretty. If the field array has been manually tampered with
-    #(which people may want to do from time to time) it will just dump self.to_s.
-    def inspect
-        unless self.fields.all? {|field| field.kind_of? Fields::Field}
-            # puts "Warning: fields manually altered, dumping raw string."
-            return self.to_s
-        end
-        @fields.inject("") {|str, field| str << field.desc + ": " + String(field.get_value)+"\n"}
-    end
-
-    #Return a cloned object, recursing through children as neccessary
-    def clone
-        clonepuppy=self.class.new
-        clonepuppy.clear_fields
-        self.fields.each {|field|
-            # this replicates most of the initialize functionality, but we can't
-            # use initialize by dumping out the string, because of variable length
-            # fields. The initialize method will greedily fill variable fields which
-            # might have been left empty during manual construction.
-            field_copy=field.deep_copy
-            clonepuppy.fields << field_copy
-            clonepuppy.add_hash_ref field_copy
-            clonepuppy.instance_eval do
-                meta_def field.name do
-                    field_copy.get_value
-                end
-                meta_def (field.name.to_s+"=").to_sym do |new_val|
-                    field_copy.set_value new_val
-                end
-            end
-
+if __FILE__==$0
+    puts "Starting tests..."
+    require 'fuzzer'
+    class Bar < BinStruct
+        parse {|bitbuf|
+            unsigned bitbuf, :baz, 8, "thing"
         }
-        if self.has_parent?
-            clonepuppy.instance_variable_set :@parent, self.parent
-            #the results for cloning a structure that isn't the top level in the
-            # child parent tree is probably a little undefined, but let's allow it
-            # for now.
-        end
-        while clonepuppy.has_children?
-            clonepuppy.remove_child clonepuppy.children.first
-        end
-        self.children.each {|child|
-            clonepuppy.add_child child.clone
-        }       
-        clonepuppy
     end
-
-    protected
-
-    def add_hash_ref( field )
-        @hash_references||={}
-        @hash_references[field.name]=field
+    class Foo < BinStruct
+        parse {|bitbuf|
+            unsigned bitbuf, :foo, 8, "thing"
+            substruct([bitbuf.slice!(0,8)].pack('B*'), :bar, 1, Bar)
+        }
     end
-
-    def clear_fields
-        @fields.replace []
-    end
-
-    # end BinStruct instance methods
-
+    f=Foo.new("\x00\x01")
+    p f
+    p f.to_s
+    p f[:foo].get_value
+    f.replace(f[:bar],"")
+    p f.to_s
+    p BinStruct.new.to_s
 end
