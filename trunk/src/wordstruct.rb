@@ -29,7 +29,7 @@ module WordStructures
         default_value :sectorshift, 9
         default_value :minisectorshift, 6
         default_value :minisectcutoff, 4096
-        endianness "intel"
+        endianness :little
     end
 
     class WordFIB < BinStruct
@@ -542,7 +542,7 @@ module WordStructures
         group :ol, :fcPlcflvcNew, :lcbPlcflvcNew
         group :ol, :fcPlcflvcNewInline, :lcbPlcflvcNewInline
         group :ol, :fcAfd, :lcbAfd
-        endianness "intel"
+        endianness :little
     end
 
 end #WordStructures
