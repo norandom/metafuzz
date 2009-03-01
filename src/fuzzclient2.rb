@@ -237,7 +237,7 @@ module FuzzClient
             :id=>id,
             :status=>status,
             :data=>crash_details,
-            :crashfile=>status==:crash? fuzzfile : false}).to_yaml)
+            :crashfile=>(status==:crash ? fuzzfile : false)}).to_yaml)
         send_data msg
     end
 
