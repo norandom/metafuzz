@@ -225,7 +225,7 @@ module FuzzServer
     end
 
     def handle_client_bye( msg )
-        @result_tracker.send("remove_"+msg.client_type+"_client")
+        @result_tracker.send("remove_"+msg.client_type.to_s+"_client")
         if @result_tracker.production_clients==0
             @production_queue.finish
         end

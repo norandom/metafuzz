@@ -510,5 +510,5 @@ class WordFIB < BinStruct
 	group :ol, :fcPlcflvcNew, :lcbPlcflvcNew
 	group :ol, :fcPlcflvcNewInline, :lcbPlcflvcNewInline
 	group :ol, :fcAfd, :lcbAfd
-	endianness "intel"
+	endianness :little
 end

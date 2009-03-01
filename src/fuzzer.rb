@@ -73,7 +73,7 @@ class Fuzzer
     # f.basic_tests("corner", 1500, false) {|pkt| some_socket.send(pkt,0)} 
     def basic_tests( overflow_maxlen=5000, send_unfixed=true, fuzzlevel=1 ) #:yields:fuzzed_item
 
-        @binstruct.fields.each do |current_field| # remember that it's possible for current_field to be not a Fields::Field
+        fuzzblock=proc do |current_field| # remember that it's possible for current_field to be not a Fields::Field
 
             # Test 1 - Enumerate possible values for this field. Uses the fuction replace_field in the Mutations module
             # to decide what to replace the field with - see that module for the defaults. It should be possible to add all
@@ -139,6 +139,11 @@ class Fuzzer
                     end
                 end
             end
+        end
+        if @binstruct.respond_to? :deep_each
+            @binstruct.deep_each &fuzzblock
+        else
+            @binstruct.fields.each &fuzzblock
         end
     end	# basic_tests
 end
