@@ -195,7 +195,9 @@ if __FILE__==$0
     p f
     p f.to_s
     p f[:foo].get_value
-    f.replace(f[:bar],"")
+    field=f.bar[:baz]
+    f.replace(field,"snails")
     p f.to_s
-    p BinStruct.new.to_s
+    f.replace("snails",field)
+    p f.to_s
 end

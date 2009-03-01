@@ -25,7 +25,13 @@ module Generators
         def to_a
             a=[]
             a << self.next while self.next?
+            self.rewind
             a
+        end
+        
+        def each(&blk)
+            blk.yield self.next while self.next?
+            self.rewind
         end
 
         def rewind
@@ -141,7 +147,7 @@ module Generators
         def cartprod(base, *others) #:nodoc:
             if block_given?
                 if others.empty?
-                    base.each{|a| yield [a]}   
+                    base.each {|a| yield [a]}   
                 else
                     base.each do | a |
                         cartprod(*others) do | b |
@@ -160,7 +166,7 @@ module Generators
         def initialize (*series)
             @series=series
             @block=Fiber.new do
-                cartprod(*series).each {|elem|
+                cartprod(*series) {|elem|
                     Fiber.yield elem
                 }
                 nil
@@ -396,6 +402,13 @@ if __FILE__==$0
     while g.next?
         foo, bar, baz=g.next
         puts "#{foo} : #{bar} -- #{baz}"
+    end
+    g1=Generators::Repeater.new((1..4),1,1,1,proc do |a| a.join end)
+    g2=Generators::Repeater.new((5..8),1,1,1,proc do |a| a.join end)
+    g=Generators::Cartesian.new(g1,g2)
+    while g.next?
+        a,b=g.next
+        puts "#{a}--#{b}"
     end
     puts "Binary Corner..."
     g=Generators::BinaryCornerCases.new(16)
