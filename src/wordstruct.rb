@@ -20,6 +20,7 @@ module WordStructures
             else
                 string bitbuf, :contents, self.recLen*8, "Contents"
             end
+            group :tl, :recType, :recLen
         }
     end
 

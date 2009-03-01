@@ -50,6 +50,7 @@ class Fuzzer
         raise ArgumentError, "Fuzzer: Fixups must all be Proc objects." unless fixups.all? {|f| f.kind_of? Proc}
         @fixups=fixups
         @preserve_length=false
+        @grouplink=true
         @check=@binstruct.to_s
     end
 
@@ -198,7 +199,35 @@ class Fuzzer
             else
                 #puts "Skipping Insert"
             end
-        end
+            if @grouplink
+                @binstruct.groups.each {|group, contents|
+                    fields=contents.flatten.map {|sym| @binstruct[sym]}
+                    saved_values=fields.map {|field| field.get_value}
+                    gens=fields.map {|field| 
+                        Mutations::Replacement_Generators[field.type].call(field, overflow_maxlen, @preserve_length, 8)
+                    }
+                    cartprod=Generators::Cartesian.new(*gens)
+                    while cartprod.next?
+                        new_values=cartprod.next
+                        fields.zip(new_values) {|field,new_value| field.set_raw(new_value.unpack('B*').join)}
+                        if send_unfixed || @fixups.empty?
+                            if count >= skip
+                                yield @binstruct 
+                            end
+                            count+=1
+                        end
+                        unless @fixups.empty?
+                            if count >= skip
+                                yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                            end
+                            count+=1
+                        end
+                    end
+                    fields.zip(saved_values) {|field,saved_value| field.set_value saved_value}
+                    raise RuntimeError, "Fuzzer: Data Corruption in cartesian product" unless @binstruct.to_s==@check
+                }
+            end
+        end # fuzzblock
         if @binstruct.respond_to? :deep_each
             @binstruct.deep_each &fuzzblock
         else

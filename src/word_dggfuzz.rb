@@ -10,7 +10,7 @@ require 'generators'
 
 class Producer < Generators::NewGen
 
-    START_AT=0
+    START_AT=250000
 
     Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
 
@@ -69,7 +69,7 @@ class Producer < Generators::NewGen
                     f=Fuzzer.new(bs)
                     #f.preserve_length=true
                     p f.count_tests(1024,false)
-                    f.basic_tests(1024,false) {|fuzz|
+                    f.basic_tests(1024,false, START_AT) {|fuzz|
                         #head+fuzzed+rest
                         fuzzary=dgg_parsed.reject {|obj| obj==bs}.insert(dgg_parsed.index(bs),fuzz)
                         ts_gunk=fuzzary.map {|bs| bs.to_s}.join

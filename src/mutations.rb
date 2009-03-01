@@ -59,21 +59,21 @@ module Mutations
 	# new blocks to the hash when they have types that need complicated fuzzing, eg ASN.1,
 	# compressed chunks and the like.
 	Replacement_Generators={} #:nodoc:
-	Replacement_Generators.default=Proc.new{|field, maxlen, preserve_length|
+	Replacement_Generators.default=Proc.new{|field, maxlen, preserve_length, random_cases|
 		if field.length_type=="fixed" or maxlen==0
 			# for fields > 8 bits, just test the corner cases
 			if field.length > 8
                                 # We're actually using RollingCorrupt, which was designed for strings, because it gives
                                 # us the ability to add random cases and also it adds and subtracts 1,3,5,7,9 from the initial
                                 # value, as well as doing the binary corner cases.   
-                                g=Generators::RollingCorrupt.new(field.to_s,field.bitstring.length,field.bitstring.length,32)
+                                g=Generators::RollingCorrupt.new(field.to_s,field.bitstring.length,field.bitstring.length,random_cases)
 			else # enumerate fully
                                 # Must return a String, hence the pack fixup.
 				g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.pack('C')})
 			end
 		elsif field.length_type=="variable"
-			rc1=Generators::RollingCorrupt.new(field.to_s,13,3,32)
-			rc2=Generators::RollingCorrupt.new(field.to_s,16,16,32)
+			rc1=Generators::RollingCorrupt.new(field.to_s,13,3,random_cases)
+			rc2=Generators::RollingCorrupt.new(field.to_s,16,16,random_cases)
                         if preserve_length
                             g=Generators::Chain.new(rc1,rc2)
                         else
@@ -89,9 +89,9 @@ module Mutations
 	#
 	#Looks up the field.type as a string in a Replacement_Generators hash, so users can expand the repetoire of
 	#generators by creating custom field types that require particular fuzzing approaches.
-	def replace_field(field, maxlen, fuzzlevel, preserve_length) #:yields:replacement_data
+	def replace_field(field, maxlen, fuzzlevel, preserve_length, random_cases=32) #:yields:replacement_data
 		#grab a generator
-		g=Replacement_Generators[field.type].call(field, maxlen, preserve_length)
+		g=Replacement_Generators[field.type].call(field, maxlen, preserve_length, random_cases)
 		while g.next?
                     yield g.next
 		end 
