@@ -3,7 +3,7 @@ require 'ramaze'
 require 'json'
 require 'rtdbwrapper'
 
-DB=RTDB.new("test.db")
+DB=RTDB.new(File.expand_path("~/fuzzserver/data/metafuzz.db"))
 
 class MainController < Ramaze::Controller
     def index

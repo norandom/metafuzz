@@ -9,13 +9,15 @@ require 'diff/lcs'
 require 'wordstruct'
 require 'ole/storage'
 require 'mutations'
-require 'result_tracker'
+require 'rt2'
+require 'sizedqueue'
 
 default_config={"AGENT NAME"=>"SERVER",
     "SERVER IP"=>"0.0.0.0",
     "SERVER PORT"=>10001,
-    "WORK DIR"=>'C:\fuzzserver',
-    "CONFIG DIR"=>'C:\fuzzserver',
+    "WORK DIR"=>File.expand_path('~/fuzzserver/data'),
+    "CONFIG DIR"=>File.expand_path('~/fuzzserver'),
+    "DATABASE FILENAME"=>"metafuzz.db",
     "COMPRESSION"=>false,
     "SEND DIFFS ONLY"=>false,
     "USE THREADPOOL"=>true,
@@ -80,38 +82,9 @@ at_exit {
     rescue
         puts "FuzzServer: Couldn't write out config."
     end
-    print "Done. Exiting.\n"
+print "Done. Exiting.\n"
 }
 
-prod_queue=SizedQueue.new(20)
-# Quickly patch the queue object to add a finished? method
-# Couldn't think of anything more elegant.
-class << prod_queue
-    def finish 
-        Thread.critical=true
-        @finished=true
-    ensure
-        Thread.critical=false
-    end
-    def finished?
-        Thread.critical=true
-        @finished||=false
-    ensure
-        Thread.critical=false
-    end
-    def template=(data)
-        Thread.critical=true
-        @template=data
-    ensure
-        Thread.critical=false
-    end
-    def template
-        Thread.critical=true
-        @template||=""
-    ensure
-        Thread.critical=false
-    end
-end
 
 module FuzzServer
 
@@ -123,29 +96,35 @@ module FuzzServer
         @handler=NetStringTokenizer.new
         puts "FuzzServer: Starting up..."
         EM.add_periodic_timer(30) do 
-            @result_tracker.spit_results
             if @production_queue.empty? and @production_queue.finished? and @result_tracker.results_outstanding==0
                 puts "All done, shutting down."
                 EventMachine::stop_event_loop
             end
         end
-        at_exit {@result_tracker.spit_results}
     end
 
-
     def handle_result( msg )
-        result_id,result_status,crashdata=msg.id, msg.status, msg.data
-        puts crashdata unless crashdata.empty? # testing, testing...
+        result_id,result_status,crashdata,crashfile=msg.id, msg.status, msg.data, msg.crashfile
         log_result=proc do
+            if result_status==:crash
+                detail_path=File.join(@config["WORK DIR"],"data","detail-"+msg_id.to_s+".txt")
+                crashfile_path=File.join(@config["WORK DIR"],"data","crash-"+msg_id.to_s+".doc")
+                File.open(detail_path, "wb+") {|io| io.write(crashdata)}
+                File.open(crashfile_path, "wb+") {|io| io.write(crashfile)}
+            end
             begin
-                @result_tracker.add_result(Integer(result_id),result_status)
+                @result_tracker.add_result(Integer(result_id),result_status,detail_path||=nil,crashfile_path||=nil)
             rescue
+                puts $!
                 sleep 1
-                @result_tracker.add_result(Integer(result_id),result_status)
+                @result_tracker.add_result(Integer(result_id),result_status,detail_path||=nil,crashfile_path||=nil)
             end
         end
-        callback=proc do nil end
-        EM.defer(log_result,callback)
+        unless @config["USE THREADPOOL"]
+            log_result.call
+        else
+            EM.defer(log_result)
+        end
     end
 
     # Only comes from fuzzclients.
@@ -154,14 +133,14 @@ module FuzzServer
             send_data(@handler.pack(FuzzMessage.new({:verb=>:server_bye}).to_yaml))
         else
             unless @config["USE THREADPOOL"]
-                id, my_data=@production_queue.pop
+                id, my_data=@production_queue.shift
                 send_data @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
             else
                 # define a block to prepare the response
                 get_data=proc do
-                    # This pop will block until data is available
+                    # This shift will block until data is available
                     # but since we are using EM.defer that's OK
-                    id, my_data=@production_queue.pop
+                    id, my_data=@production_queue.shift
                     # This is what will be passed to the callback
                     @handler.pack(FuzzMessage.new({:verb=>:deliver,:data=>my_data,:id=>id}).to_yaml)
                 end
@@ -244,8 +223,8 @@ module FuzzServer
 
 end
 
-rt=ResultTracker.new
+rt=ResultTracker.new(File.join(config["WORK DIR"],config["DATABASE FILENAME"]))
 
 EventMachine::run {
-    EventMachine::start_server(config["SERVER IP"], config["SERVER PORT"], FuzzServer, prod_queue, rt, config)
+    EventMachine::start_server(config["SERVER IP"], config["SERVER PORT"], FuzzServer, SQ.new(20), rt, config)
 }

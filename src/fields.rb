@@ -48,6 +48,7 @@ module Fields
         # Provided for classes that require strict lengths. Left pads with 0 to @length
         # if the input buffer is incomplete. Truncates at @length if too long. Called by <tt>parse_buffer</tt> internally.
         def parse_buffer_strict( bitstring )
+            return "" unless bitstring
             bitstring||=""
             unless bitstring.is_a? String and bitstring=~/^[10]*$/
                 raise ArgumentError, "Field: <Internal> bitstring buffer borked?? #{bitstring.inspect}"
@@ -64,6 +65,7 @@ module Fields
         # Provided for classes that don't care about length matching
         # when assigning the contents. Called by <tt>parse_buffer</tt> internally.
         def parse_buffer_lazy( bitstring )
+            return "" unless bitstring
             bitstring||=""
             unless bitstring.is_a? String and bitstring=~/^[10]*$/
                 raise ArgumentError, "#{self.class.to_s[/\w+$/]} (#{@name}): <Internal> bitstring buffer borked??"

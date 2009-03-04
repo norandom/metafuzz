@@ -124,9 +124,7 @@ class BinStruct
     def deep_each( &blk )
         # yield all fields in the structure, entering nested substructs as necessary
         @fields.each {|atom|
-            if atom.is_a? Bitfield
-                atom.fields.each {|f| yield f}
-            elsif atom.is_a? BinStruct # but not a Bitfield
+            if atom.is_a? BinStruct
                 atom.deep_each &blk
             else
                 yield atom
@@ -175,29 +173,19 @@ class BinStruct
     def length
         self.to_s.length
     end
+    
+    def inspect
+        self.flatten.map {|field| "<#{field.class}><#{field.length}><#{field.to_s.each_byte.to_a.map {|b| "%.2x" % b}.join(' ')}>"}
+    end
 end
 
 if __FILE__==$0
     puts "Starting tests..."
     require 'fuzzer'
-    class Bar < BinStruct
-        parse {|bitbuf|
-            unsigned bitbuf, :baz, 8, "thing"
-        }
-    end
-    class Foo < BinStruct
-        parse {|bitbuf|
-            unsigned bitbuf, :foo, 8, "thing"
-            substruct([bitbuf.slice!(0,8)].pack('B*'), :bar, 1, Bar)
-        }
-    end
-    f=Foo.new("\x00\x01")
-    p f
-    p f.to_s
-    p f[:foo].get_value
-    field=f.bar[:baz]
-    f.replace(field,"snails")
-    p f.to_s
-    f.replace("snails",field)
-    p f.to_s
+    require 'wordstruct'
+    b=WordStructures::WordDgg.new
+    f=Fuzzer.new(b)
+    f.preserve_length=true
+    p f.count_tests
+    
 end
