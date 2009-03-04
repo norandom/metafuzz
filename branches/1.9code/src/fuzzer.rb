@@ -17,6 +17,7 @@ class Fuzzer
     # to be able to deal with the fact that the fields may not all be kind_of? Field::Field
     # if some extension code or a previous fixup has messed with the obj#fields Array directly.
 
+    attr_reader :check
     attr_accessor :preserve_length
 
     def self.string_to_binstruct( str, granularity=8 )
@@ -57,10 +58,11 @@ class Fuzzer
     def count_tests(overflow_maxlen=5000, send_unfixed=true, skip=0, fuzzlevel=1)
         num_tests=0
         begin
-            self.basic_tests(overflow_maxlen, send_unfixed, skip, fuzzlevel) {|t| num_tests+=1}
+            self.basic_tests(overflow_maxlen, send_unfixed, skip, fuzzlevel) {|t| 
+                num_tests+=1
+            }
         rescue
-            puts num_tests
-            raise RuntimeError, "Count: An error. #{$!}"
+            raise RuntimeError, "Fuzzer:count_tests: An error #{$!} at #{num_tests}"
             exit
         end
         num_tests
@@ -93,8 +95,10 @@ class Fuzzer
             replace_field(current_field, overflow_maxlen, fuzzlevel, @preserve_length) do |value| 
                 begin
                     # best to set it using raw binary to avoid signedness issues etc
-                    current_field.set_raw value.unpack('B*').join
+                    current_field.set_raw value.unpack('B*').join[-current_field.length..-1]
+                    next if current_field.get_value==val
                 rescue ArgumentError, NoMethodError
+                    puts "Skipping field: #{$!}"
                     # most likely was not a Fields::Field
                     next
                 end
@@ -129,6 +133,7 @@ class Fuzzer
             nulfield=BinStruct.new 
             unless @preserve_length
                 @binstruct.replace(current_field, nulfield)
+                next if @binstruct.to_s==@check
                 if send_unfixed || @fixups.empty?
                     if count >= skip
                         yield @binstruct 
@@ -199,39 +204,39 @@ class Fuzzer
             else
                 #puts "Skipping Insert"
             end
-            if @grouplink
-                @binstruct.groups.each {|group, contents|
-                    fields=contents.flatten.map {|sym| @binstruct[sym]}
-                    saved_values=fields.map {|field| field.get_value}
-                    gens=fields.map {|field| 
-                        Mutations::Replacement_Generators[field.type].call(field, overflow_maxlen, @preserve_length, 8)
-                    }
-                    cartprod=Generators::Cartesian.new(*gens)
-                    while cartprod.next?
-                        new_values=cartprod.next
-                        fields.zip(new_values) {|field,new_value| field.set_raw(new_value.unpack('B*').join)}
-                        if send_unfixed || @fixups.empty?
-                            if count >= skip
-                                yield @binstruct 
-                            end
-                            count+=1
-                        end
-                        unless @fixups.empty?
-                            if count >= skip
-                                yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
-                            end
-                            count+=1
-                        end
-                    end
-                    fields.zip(saved_values) {|field,saved_value| field.set_value saved_value}
-                    raise RuntimeError, "Fuzzer: Data Corruption in cartesian product" unless @binstruct.to_s==@check
-                }
-            end
         end # fuzzblock
         if @binstruct.respond_to? :deep_each
             @binstruct.deep_each &fuzzblock
         else
             @binstruct.fields.each &fuzzblock
+        end
+        if @grouplink
+            @binstruct.groups.each {|group, contents|
+                fields=contents.flatten.map {|sym| @binstruct[sym]}
+                saved_values=fields.map {|field| field.get_value}
+                gens=fields.map {|field| 
+                    Mutations::Replacement_Generators[field.type].call(field, overflow_maxlen, @preserve_length, 8)
+                }
+                cartprod=Generators::Cartesian.new(*gens)
+                while cartprod.next?
+                    new_values=cartprod.next
+                    fields.zip(new_values) {|field,new_value| field.set_raw(new_value.unpack('B*').join[-field.length..-1])}
+                    if send_unfixed || @fixups.empty?
+                        if count >= skip
+                            yield @binstruct 
+                        end
+                        count+=1
+                    end
+                    unless @fixups.empty?
+                        if count >= skip
+                            yield @fixups.inject(@binstruct) {|struct,fixup| fixup.call(struct)} if @fixups
+                        end
+                        count+=1
+                    end
+                end
+                fields.zip(saved_values) {|field,saved_value| field.set_value saved_value}
+                raise RuntimeError, "Fuzzer: Data Corruption in cartesian product" unless @binstruct.to_s==@check
+            }
         end
     end	# basic_tests
 end

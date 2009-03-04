@@ -191,7 +191,6 @@ module Generators
     #  "0001111111111111", "1111111111111000", "1010101010101010", "0101010101010101"]
     class BinaryCornerCases < NewGen
 
-
         def initialize (bitlength)
             @bitlength=bitlength
             cases=[]
@@ -227,6 +226,7 @@ module Generators
                 nil
             end 
             super
+            @alive=false if bitlength==0
         end
     end
 
@@ -247,6 +247,7 @@ module Generators
                 false
             end 
             super
+            @alive=false unless @generators.any? {|g| g.next?}
         end
 
         def rewind
@@ -265,6 +266,7 @@ module Generators
                 false
             end 
             super
+            @alive=false if bitlength==0
         end
     end
     # Parameters: String, Bitlength, Stepsize,Random Cases=0
@@ -319,6 +321,7 @@ module Generators
                 nil
             end 
             super
+            @alive=false if str.empty?
         end
 
     end
@@ -411,8 +414,8 @@ if __FILE__==$0
         puts "#{a}--#{b}"
     end
     puts "Binary Corner..."
-    g=Generators::BinaryCornerCases.new(16)
-    puts g.to_a.map {|c| "%.16b" % c}
+    g=Generators::BinaryCornerCases.new(8)
+    puts g.to_a.map {|c| "%.8b" % c}
     puts "Chain"
     g1=Generators::BinaryCornerCases.new(16)
     g2=Generators::BinaryCornerCases.new(8)
@@ -420,7 +423,7 @@ if __FILE__==$0
     p chain
     p chain.to_a
     puts "Binary Corrupt..."
-    g=Generators::RollingCorrupt.new("aaaaaaaa",16,16,0)
+    g=Generators::RollingCorrupt.new("a",8,8,0)
     while g.next?
         p g.next
     end

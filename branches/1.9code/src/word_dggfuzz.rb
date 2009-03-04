@@ -10,7 +10,7 @@ require 'generators'
 
 class Producer < Generators::NewGen
 
-    START_AT=250000
+    START_AT=0
 
     Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
 
@@ -71,10 +71,12 @@ class Producer < Generators::NewGen
                     p f.count_tests(1024,false)
                     f.basic_tests(1024,false, START_AT) {|fuzz|
                         #head+fuzzed+rest
-                        fuzzary=dgg_parsed.reject {|obj| obj==bs}.insert(dgg_parsed.index(bs),fuzz)
+                        raise RuntimeError, "Dggfuzz: wtf, old == new?" if fuzz.to_s==f.check
+                        fuzzary=dgg_parsed.map {|obj| obj==bs ? fuzz : obj}
                         ts_gunk=fuzzary.map {|bs| bs.to_s}.join
                         #raise RuntimeError, "DggFuzz: Dgg length mismatch" unless ts_gunk.length==1814
                         fuzzed_table=ts_head+ts_gunk+ts_rest
+                        raise RuntimeError, "Dggfuzz: fuzzed table stream same as old one!" if fuzzed_table==table_stream
                         #write the modified stream
                         Ole::Storage.open(temp_file.path,'rb+') {|ole|
                             ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}

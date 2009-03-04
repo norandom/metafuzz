@@ -66,10 +66,10 @@ module Mutations
                                 # We're actually using RollingCorrupt, which was designed for strings, because it gives
                                 # us the ability to add random cases and also it adds and subtracts 1,3,5,7,9 from the initial
                                 # value, as well as doing the binary corner cases.   
-                                g=Generators::RollingCorrupt.new(field.to_s,field.bitstring.length,field.bitstring.length,random_cases)
+                                g=Generators::RollingCorrupt.new(field.to_s,field.to_s.length*8,field.to_s.length*8,random_cases)
 			else # enumerate fully
                                 # Must return a String, hence the pack fixup.
-				g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.pack('C')})
+				g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.pack('c')})
 			end
 		elsif field.length_type=="variable"
 			rc1=Generators::RollingCorrupt.new(field.to_s,13,3,random_cases)
@@ -95,8 +95,8 @@ module Mutations
 		while g.next?
                     yield g.next
 		end 
-                g=nil
 	end #replace_field
+	module_function :replace_field
 	
 	#Yields a series of data elements that can be injected immediately before the field which is passed as a parameter,
 	#and once after the final field.
@@ -110,7 +110,20 @@ module Mutations
 		while g.next?
 			yield g.next
 		end
-                g=nil
 	end #inject_data
 	
 end
+
+if __FILE__==$0
+    require 'binstruct'
+    require 'generators'
+    bs=BinStruct.new("") {|buf| string buf, :foo, 8, "thing"}
+    a=[]
+    bs.fields.each {|f|
+        Mutations.replace_field(f,1024,1,true,8) {|val| a << val}
+    }
+    p a
+end
+
+
+    
