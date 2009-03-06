@@ -289,6 +289,8 @@ module FuzzClient
 end
 
 EventMachine::run {
+    system("start ruby wordslayer.rb")
+    system("start ruby dk.rb")
     EventMachine::connect(config["SERVER IP"],config["SERVER PORT"], FuzzClient, config)
 }
 puts "Event loop stopped. Shutting down."
