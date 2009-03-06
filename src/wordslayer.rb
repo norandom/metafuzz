@@ -5,9 +5,7 @@ require 'fileutils'
 
 
 def get_process_array(wmi)
-    # 48 == wbemFlagForwardOnly + wbemFlagReturnImmediately. Forward Only uses less memory if you don't want
-    # to call one of the Object.Clone_ methods, according to MSDN.
-    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'",48)
+    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
     ary=[]
     processes.each {|p|
         ary << p.ProcessId
@@ -40,11 +38,8 @@ begin
         word_instances.delete_if {|pid,kill_level| not procs.include?(pid)}
         procs.each {|p| word_instances[p]+=1}
         word_instances.each {|pid,kill_level|
-            if kill_level > 8
+            if kill_level > 1 # seen before, try and kill
                 Process.kill(9,pid)
-                print "<!#{pid}!>";$stdout.flush
-            elsif kill_level > 1 # seen before, try and kill
-                Process.kill(1,pid)
                 print "<#{pid}>";$stdout.flush
                 word_instances[pid]=9
             end
