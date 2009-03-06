@@ -5,7 +5,9 @@ require 'fileutils'
 
 
 def get_process_array(wmi)
-    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'")
+    # 48 == wbemFlagForwardOnly + wbemFlagReturnImmediately. Forward Only uses less memory if you don't want
+    # to call one of the Object.Clone_ methods, according to MSDN.
+    processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE' or name='DW20.EXE'",48)
     ary=[]
     processes.each {|p|
         ary << p.ProcessId
@@ -31,8 +33,8 @@ def delete_temp_files
 end
 
 word_instances=Hash.new(0)
+wmi = WIN32OLE.connect("winmgmts://")
 begin
-    wmi = WIN32OLE.connect("winmgmts://")
     loop do
         procs=get_process_array(wmi)
         word_instances.delete_if {|pid,kill_level| not procs.include?(pid)}
