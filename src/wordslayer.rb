@@ -15,11 +15,8 @@ def get_process_array(wmi)
 end
 
 def delete_temp_files
-    tempfiles=['B:/Temporary Internet Files/Content.Word/*.*','B:/Temporary Internet Files/Content.MSO/*.*']
-    fuzzfiles='B:/fuzzclient/~$*.doc'
-
-    [tempfiles,fuzzfiles].flatten.each {|pattern|
-        Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
+        Dir.glob('B:/**/*.*', File::FNM_DOTMATCH).each {|fn|
+            next if File.directory?(fn)
             begin
                 FileUtils.rm_f(fn)
             rescue
@@ -27,7 +24,6 @@ def delete_temp_files
             end
             print "@";$stdout.flush
         }
-    }
 end
 
 word_instances=Hash.new(0)
