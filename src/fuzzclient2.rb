@@ -170,7 +170,7 @@ module FuzzClient
                     status=:crash
                     sleep(0.1) while debugger.target_running?
                     crash_details=debugger.dq_all.join
-                    File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
+                    #File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                     # If the app has crashed we should kill the debugger, otherwise
                     # the app won't be killed without -9.

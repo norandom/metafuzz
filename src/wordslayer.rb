@@ -15,8 +15,8 @@ def get_process_array(wmi)
 end
 
 def delete_temp_files
-    tempfiles='C:/Documents and Settings/Administrator/Local Settings/Temporary Internet Files/Content.Word/*WR*.tmp'
-    fuzzfiles='C:/fuzzclient/~$*.doc'
+    tempfiles='B:/Temporary Internet Files/Content.Word/*WR*.tmp'
+    fuzzfiles='B:/fuzzclient/~$*.doc'
 
     [tempfiles,fuzzfiles].each {|pattern|
         Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn| 
