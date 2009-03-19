@@ -15,7 +15,9 @@ def get_process_array(wmi)
 end
 
 def delete_temp_files
-        Dir.glob('B:/**/*.*', File::FNM_DOTMATCH).each {|fn|
+        patterns=['B:/Temp/**/*.*', 'B:/Temporary Internet Files/**/*.*', 'B:/fuzzclient/~$*.doc']
+        patterns.each {|pattern|
+        Dir.glob(pattern, File::FNM_DOTMATCH).each {|fn|
             next if File.directory?(fn)
             begin
                 FileUtils.rm_f(fn)
@@ -24,10 +26,12 @@ def delete_temp_files
             end
             print "@";$stdout.flush
         }
+        }
 end
 
 word_instances=Hash.new(0)
 wmi = WIN32OLE.connect("winmgmts://")
+FileUtils.mkdir_p 'B:/Temp'
 begin
     loop do
         procs=get_process_array(wmi)
