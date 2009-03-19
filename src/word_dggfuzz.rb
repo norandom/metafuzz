@@ -13,6 +13,7 @@ class Producer < Generators::NewGen
     START_AT=0
 
     Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
+    #Template=File.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
@@ -22,6 +23,59 @@ class Producer < Generators::NewGen
             ret << "\n"
         }
         ret
+    end
+
+    def dggdiff(old, new)
+
+        begin
+            puts "Diffing"
+            orig_file=old
+            corrupt_file=new
+            raw_fib=IO.read(orig_file,1472,512)
+            fib=WordStructures::WordFIB.new(raw_fib)
+            ole_old=Ole::Storage.open(orig_file,'rb')
+            table_stream_old=ole_old.file.read("1Table")
+            ole_old.close
+            ole_new=Ole::Storage.open(corrupt_file,'rb')
+            table_stream_new=ole_new.file.read("1Table")
+            ole_new.close
+            fc=:fcDggInfo
+            lcb=:lcbDggInfo
+            raw_old=table_stream_old[fib.send(fc),fib.send(lcb)]
+            raw_new=table_stream_new[fib.send(fc),fib.send(lcb)]
+            puts "Same" if raw_old==raw_new
+            dgg_parsed_old=[]
+            while raw_old.length > 0
+                dgg_parsed_old << WordStructures::WordDgg.new(raw_old)
+                if raw_old.length > 0
+                    dgg_parsed_old << BinStruct.new(raw_old.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
+                end
+            end
+            dgg_parsed_new=[]
+            while raw_new.length > 0
+                dgg_parsed_new << WordStructures::WordDgg.new(raw_new)
+                if raw_new.length > 0
+                    dgg_parsed_new << BinStruct.new(raw_new.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
+                end
+            end
+            dgg_parsed_old.zip(dgg_parsed_new) {|oldbs,newbs|
+                oldbs.inspect.zip(newbs.inspect) {|oldfield,newfield|
+                    unless oldfield==newfield
+                        #index=oldfield.match(/<IDX:(\d+)>/)[1].to_i
+                        #puts "Before..."
+                        #p oldbs.inspect[index-5..index-1]
+                        #puts "Changed.."
+                        p oldfield
+                        p newfield
+                        #puts "After..."
+                        #p oldbs.inspect[index+1..index+5]
+                    end
+                }
+
+            }
+        rescue
+            puts $!
+        end
     end
 
     def initialize
@@ -40,8 +94,10 @@ class Producer < Generators::NewGen
                 fib=WordStructures::WordFIB.new(raw_fib.clone)
                 raise RuntimeError, "Data Corruption - fib.to_s not raw_fib" unless fib.to_s == raw_fib
                 # Open the file, get a copy of the table stream
-                ole=Ole::Storage.open(File.join(Config["WORK DIR"],"boof.doc"),'rb')
-                table_stream=ole.file.read("1Table")
+                ole=Ole::Storage.open(temp_file.path,'rb')
+                #ole=Ole::Storage.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb")
+                # get the correct table stream 1Table or 0Table
+                table_stream=ole.file.read(fib.fWhichTblStm.to_s+"Table")
                 ole.close
                 fc=:fcDggInfo
                 lcb=:lcbDggInfo
@@ -65,42 +121,51 @@ class Producer < Generators::NewGen
                     raise RuntimeError, "DggFuzz: #{$!}"
                 end
                 raise RuntimeError, "Data Corruption - Binstruct.to_s not fuzztarget" unless dgg_parsed.map {|s| s.to_s}.join == fuzztarget
-                dgg_parsed.each {|bs|
-                    f=Fuzzer.new(bs)
-                    #f.preserve_length=true
-                    p f.count_tests(1024,false)
+                dgg_parsed[2..2].each {|bs|
+                    typefixer=proc {|bs| bs.flatten.each {|f|
+                        if f.name==:recType
+                            f.set_value(f.get_value | 0xf000)
+                        end
+                    }
+                    bs
+                    }
+                    f=Fuzzer.new(bs,typefixer)
+                    f.preserve_length=true
+                    #p f.count_tests(1024,false)
                     f.basic_tests(1024,false, START_AT) {|fuzz|
                         #head+fuzzed+rest
-                        raise RuntimeError, "Dggfuzz: wtf, old == new?" if fuzz.to_s==f.check
-                        fuzzary=dgg_parsed.map {|obj| obj==bs ? fuzz : obj}
-                        ts_gunk=fuzzary.map {|bs| bs.to_s}.join
+                        ts_gunk=dgg_parsed.map {|obj| obj==bs ? fuzz : obj}.join
                         #raise RuntimeError, "DggFuzz: Dgg length mismatch" unless ts_gunk.length==1814
                         fuzzed_table=ts_head+ts_gunk+ts_rest
                         raise RuntimeError, "Dggfuzz: fuzzed table stream same as old one!" if fuzzed_table==table_stream
-                        #write the modified stream
+                        #write the modified stream into the temp file
                         Ole::Storage.open(temp_file.path,'rb+') {|ole|
-                            ole.file.open("1Table","wb+") {|f| f.write( fuzzed_table )}
+                            # get the correct table stream 1Table or 0Table
+                            ts=ole.dirents.map{|d| d.name}.select {|s| s=~/table/i}[0][0]
+                            ole.file.open(ts+"Table","wb+") {|f| f.write( fuzzed_table )}
                         }
-                        # Read in the new file contents
-                        File.open( temp_file.path,"rb") {|io| 
-                            header=io.read(512)
-                            raw_fib=io.read(1472)
-                            rest=io.read
-                        }
-                        newfib=WordStructures::WordFIB.new(raw_fib)
-                        #adjust the lcb
-                        newfib.send((lcb.to_s+'=').to_sym, ts_gunk.length)
-                        #adjust the offsets for all subsequent structures
-                        length_delta=ts_gunk.length-fuzztarget.length
-                        if length_delta != 0
+                        unless (ts_gunk.length-fuzztarget.length) == 0
+                            raise RuntimeError, "Dggfuzz: Fuzzer is set to preserve length, but delta !=0?"
+                            # Read in the new file contents with the modified table stream
+                            # so we can fix up the FIB pointers and lengths and such
+                            File.open( temp_file.path,"rb") {|io| 
+                                header=io.read(512)
+                                raw_fib=io.read(1472)
+                                rest=io.read
+                            }
+                            newfib=WordStructures::WordFIB.new(raw_fib)
+                            #adjust the lcb for this structure
+                            newfib.send((lcb.to_s+'=').to_sym, ts_gunk.length)
+                            #adjust the offsets for all subsequent structures
                             fib.groups[:ol].each {|off,len|
                                 if (fib.send(off) > fib.send(fc)) and fib.send(len) > 0
                                     newfib.send((off.to_s+'=').to_sym, fib.send(off)+length_delta)
                                 end
                             }
+                            File.open(temp_file.path,"wb+") {|io| io.write header+newfib.to_s+rest}
                         end
                         #add to the queue
-                        Fiber.yield( (header+newfib.to_s+rest) )
+                        Fiber.yield( File.open(temp_file.path,"rb") {|io| io.read} )
                     }
                 }
             rescue
@@ -111,6 +176,4 @@ class Producer < Generators::NewGen
         end
         super
     end
-
-
 end

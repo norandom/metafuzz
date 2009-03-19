@@ -5,16 +5,16 @@ class BinStruct
 
     class Bitfield < BinStruct
     end
-    attr_reader :groups, :endian
-    attr_accessor :fields
+    attr_reader :groups
+    attr_accessor :fields, :endian
     #---------------CONSTRUCTION-------------------
     def endian( sym )
         unless sym==:little || sym==:big
             raise RuntimeError, "BinStruct: Construction: Unknown endianness #{sym.to_s}"
         end
         @endian=sym
-        meta_def :endian do sym end
-        meta_def :endianness do sym end
+        meta_def :endian do @endian end
+        meta_def :endianness do @endian end
     end
 
     def bitfield(bitbuf, len, &blk)
@@ -22,15 +22,17 @@ class BinStruct
             unless len==16||len==32||len==64
                 raise RuntimeError, "BinStruct: Bitfield: Don't know how to endian swap #{len} bits. :("
             end
-            instr=bitbuf.slice!(0,len).scan(/.{8}/).reverse.join.reverse
+            instr=bitbuf.slice!(0,len).scan(/.{8}/).reverse.join
         else
             instr=bitbuf.slice!(0,len)
         end
         new=Bitfield.new([instr].pack('B*'), &blk)
         if @endian==:little
+            # This is so we know to flip the bytes back in #to_s
             new.instance_variable_set :@endian_flip_hack, true
         end
         @fields << new
+        # Add direct references and accessor methods to the containing Binstruct
         new.fields.each {|f| 
             unless f.is_a? Fields::Field
                 raise RuntimeError, "BinStruct: Construction: Illegal content #{f.class} in bitfield - use only Fields"
@@ -125,7 +127,7 @@ class BinStruct
         # yield all fields in the structure, entering nested substructs as necessary
         @fields.each {|atom|
             if atom.is_a? BinStruct
-                atom.deep_each &blk
+                atom.deep_each &blk unless atom.fields.empty?
             else
                 yield atom
             end
@@ -162,9 +164,9 @@ class BinStruct
         unless bits.length % 8 == 0
             #puts "Warning, structure not byte aligned, right padding with 0"
         end
-        bits=bits.reverse if @endian_flip_hack
         return "" if bits.empty?
         bytearray=bits.scan(/.{1,8}/)
+        # If not byte aligned, right pad with 0
         bytearray.last << '0'*(8-bytearray.last.length) if bytearray.last.length < 8
         bytearray=bytearray.reverse if @endian_flip_hack
         bytearray.map {|byte| "" << byte.to_i(2)}.join
@@ -175,17 +177,8 @@ class BinStruct
     end
     
     def inspect
-        self.flatten.map {|field| "<#{field.class}><#{field.length}><#{field.to_s.each_byte.to_a.map {|b| "%.2x" % b}.join(' ')}>"}
+        self.flatten.map {|field| "<IDX:#{self.flatten.index(field)}><#{field.class.to_s.match(/::(.+)Field/)[1]}><#{field.name}><#{field.length}><#{field.to_s[0..12].each_byte.to_a.map {|b| "%.2x" % b}.join(' ') + (field.to_s.length>12?"...":"")}>"}
     end
 end
 
-if __FILE__==$0
-    puts "Starting tests..."
-    require 'fuzzer'
-    require 'wordstruct'
-    b=WordStructures::WordDgg.new
-    f=Fuzzer.new(b)
-    f.preserve_length=true
-    p f.count_tests
-    
-end
+

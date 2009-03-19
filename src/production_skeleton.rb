@@ -155,10 +155,14 @@ module ProductionClient
             send_test_case @production_generator.next, @case_id
         else
             send_client_bye
+            puts "All done, exiting."
+            EventMachine::stop_event_loop
         end
     end
 
     def handle_server_bye( msg )
+        puts "All done, exiting."
+        EventMachine::stop_event_loop
     end
 
     def method_missing( meth, *args )
@@ -166,6 +170,7 @@ module ProductionClient
     end
 
     def initialize(config)
+        puts "Starting up"
         @config=config
         @server_ready=false
         # The Producer module must be defined in the FUZZCODE FILE param of the config
@@ -176,6 +181,7 @@ module ProductionClient
     end
 
     def post_init
+        puts "Connecting to server"
         send_client_startup
     end
 

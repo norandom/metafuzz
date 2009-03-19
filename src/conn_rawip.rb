@@ -5,7 +5,7 @@ require 'socket'
 #
 #Parameters: dest_host (string), ip_proto (0-255 or Socket constant)
 module CONN_RAWIP
-    
+
     #These methods will override the stubs present in the Connector
     #class, and implement the protocol specific functionality for 
     #these generic functions.
@@ -15,7 +15,7 @@ module CONN_RAWIP
     #
     #Errors should be handled at the Module level (ie here), since Connector
     #just assumes everything is going to plan.
-    
+
     #Set up a new socket.
     def establish_connection
         @dest, @proto = @module_args

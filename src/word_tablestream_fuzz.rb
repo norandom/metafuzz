@@ -17,18 +17,18 @@ module Producer
             unmodified_file=File.open( 'c:\bunk\foo.doc',"rb") {|io| io.read}
             header,raw_fib,rest=""
             prod_queue.template=unmodified_file
-            FileUtils.copy('c:\bunk\foo.doc','c:\bunk\tmp.doc')
-            File.open( 'c:\bunk\tmp.doc',"rb") {|io| 
-                header=io.read(512)
-                raw_fib=io.read(1472)
-                rest=io.read
-            }
+            unmodified_io=StrinIO.new(unmodified_file.clone)
+            header=unmodified_io.read(512)
+            raw_fib=unmodified_io.read(1472)
+            rest=unmodified_io.read
             raise RuntimeError, "Producer: Data Corruption" unless header+raw_fib+rest == unmodified_file
             fib=WordStructures::WordFIB.new(raw_fib)
             # Open the file, get a copy of the table stream
-            ole=Ole::Storage.open('c:\bunk\foo.doc','rb')
-            table_stream=ole.file.read("1Table")
-            ole.close
+            unmodified_io.rewind
+            table_stream=""
+            Ole::Storage.open(unmodified_io) {|ole|
+                table_stream=ole.file.read(fib.fWhichTblStm.to_s+"Table")
+            }
             fib.groups[:ol].each {|fc,lcb|
                 gJunk=Mutations.create_string_generator(Array((0..255)).map {|e| "" << e},50000)
                 while gJunk.next?

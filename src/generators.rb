@@ -278,9 +278,15 @@ module Generators
     # If an integer is specified for the Random Cases parameter then the generator will also add that number
     # of random binary strings to the corruption
     class RollingCorrupt < NewGen
-        def initialize(str, bitlength, stepsize,random_cases=0)
+        
+        def byteswap_bitstring( bitstring )
+            bitstring.scan(/.{8}/).reverse.join
+        end
+
+        def initialize(str, bitlength, stepsize,random_cases=0,endian=:big)
             @str,@bitlength,@stepsize,@random_cases=str,bitlength,stepsize,random_cases
             @binstr=str.unpack('B*').first
+            @swap=(endian==:little && (bitlength==16 || bitlength==32 || bitlength==64))
             raise RuntimeError, "Generators::RollingCorrupt: internal bitstring conversion broken?" unless @binstr.length==(@str.length*8)
             @block=Fiber.new do 
                 gBin=Generators::BinaryCornerCases.new(bitlength)
@@ -293,18 +299,22 @@ module Generators
                 rng=Range.new(0, @binstr.length-1)
                 rng.step(stepsize) {|idx|
                     gFinal.rewind
-                    # Add / Subtract 1,3,5,7,9 from the value that was there
-                    [1,3,5,9].each {|num|
+                    # Add / Subtract 1..9 from the value that was there
+                    (1..9).each {|num|
                         out_str=@binstr.clone
                         to_change=out_str[idx..idx+(bitlength-1)]
+                        to_change=byteswap_bitstring(to_change) if @swap
                         changed="%.#{bitlength}b" % (to_change.to_i(2) + num)
+                        changed=byteswap_bitstring(changed) if @swap
                         out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
                         out_str=[out_str[0..@binstr.length-1]].pack('B*')
                         raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length
                         Fiber.yield out_str
                         out_str=@binstr.clone
                         to_change=out_str[idx..idx+(bitlength-1)]
+                        to_change=byteswap_bitstring(to_change) if @swap
                         changed="%.#{bitlength}b" % (to_change.to_i(2) - num)
+                        changed=byteswap_bitstring(changed) if @swap
                         out_str[idx..idx+(bitlength-1)]=changed[0,bitlength]
                         out_str=[out_str[0..@binstr.length-1]].pack('B*')
                         raise RuntimeError, "Generators:RollingCorrupt: Data corruption." unless out_str.length==@str.length

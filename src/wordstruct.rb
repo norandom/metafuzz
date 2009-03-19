@@ -1,12 +1,36 @@
 require 'binstruct'
 module WordStructures
 
+    class WordSPRM < BinStruct
+        attr_reader :length_check
+        parse {|buf|
+            spra_table={0=>1,1=>1,2=>2,3=>4,4=>2,5=>2,6=>:variable,7=>3}
+            endian :little
+            bitfield(buf,16){|buf|
+                unsigned buf, :spra, 3, "Size of SPRM argument"
+                unsigned buf, :sgc, 3, "SPRM group - type of SPRM"
+                unsigned buf, :fSpec, 1, "SPRM requires special handling"
+                unsigned buf, :ismpd, 9, "Unique ID within sgc group"
+            }
+            if spra_table[self.spra]==:variable
+                unsigned buf, :opLen, 8, "Operand length"
+                @length_check=self.opLen
+                string buf, :operand, self.opLen*8, "Parameter"
+                group :sprastuff, :sgc, :opLen, :fSpec, :operand
+            else
+                @length_check=spra_table[self.spra]
+                unsigned buf, :operand, spra_table[self.spra]*8, "Parameter"
+                group :sprastuff, :spra, :sgc, :operand
+            end
+        }
+    end
+
     class WordDgg < BinStruct
         parse{ |bitbuf|
             endian :little
             bitfield(bitbuf, 16) do |buf|
-                unsigned buf, :recVer, 4, "Object version, 0xF for container"
                 unsigned buf, :recInstance, 12, "Object Identifier"
+                unsigned buf, :recVer, 4, "Object version, 0xF for container"
             end
             unsigned bitbuf, :recType, 16, "RecType"
             unsigned bitbuf, :recLen, 32, "Content length"
@@ -20,7 +44,11 @@ module WordStructures
             else
                 string bitbuf, :contents, self.recLen*8, "Contents"
             end
-            group :tl, :recType, :recLen
+            if self[:contents]
+                group :tv, :recType, :contents
+            else
+                group :tl, :recType, :recLen
+            end
         }
     end
 
@@ -58,19 +86,21 @@ module WordStructures
             unsigned buf, :nProduct, 16, "4 Product version written by"
             unsigned buf, :Lid, 16, "6 Language stamp --localized version In pre-WinWord 2.0 files t[...]"
             unsigned buf, :pnNext, 16, ""
-            unsigned buf, :fDot, 1, "10 Set if this document is a template"
-            unsigned buf, :fGlsy, 1, "Set if this document is a glossary"
-            unsigned buf, :fComplex, 1, "When 1, file is in complex, fast-saved format."
-            unsigned buf, :fHasPic, 1, "Set if file contains 1 or more pictures"
-            unsigned buf, :cQuickSaves, 4, "Count of times file was quick saved"
-            unsigned buf, :fEncrypted, 1, "Set if file is encrypted"
-            unsigned buf, :fWhichTblStm, 1, "When 0, this fib refers to the table stream named ?0Table?, whe[...]"
-            unsigned buf, :fReadOnlyRecommended, 1, "Set when user has recommended that file be read read-only"
-            unsigned buf, :fWriteReservation, 1, "Set when file owner has made the file write reserved"
-            unsigned buf, :fExtChar, 1, "Set when using extended character set in file"
-            unsigned buf, :fLoadOverride, 1, "REVIEW"
-            unsigned buf, :fFarEast, 1, "REVIEW"
-            unsigned buf, :fCrypto, 1, "REVIEW"
+            bitfield(buf,16) do |buf|
+                unsigned buf, :fCrypto, 1, "REVIEW"
+                unsigned buf, :fFarEast, 1, "REVIEW"
+                unsigned buf, :fLoadOverride, 1, "REVIEW"
+                unsigned buf, :fExtChar, 1, "Set when using extended character set in file"
+                unsigned buf, :fWriteReservation, 1, "Set when file owner has made the file write reserved"
+                unsigned buf, :fReadOnlyRecommended, 1, "Set when user has recommended that file be read read-only"
+                unsigned buf, :fWhichTblStm, 1, "When 0, this fib refers to the table stream named ?0Table?, whe[...]"
+                unsigned buf, :fEncrypted, 1, "Set if file is encrypted"
+                unsigned buf, :cQuickSaves, 4, "Count of times file was quick saved"
+                unsigned buf, :fHasPic, 1, "Set if file contains 1 or more pictures"
+                unsigned buf, :fComplex, 1, "When 1, file is in complex, fast-saved format."
+                unsigned buf, :fGlsy, 1, "Set if this document is a glossary"
+                unsigned buf, :fDot, 1, "10 Set if this document is a template"
+            end
             unsigned buf, :nFibBack, 16, "12 This file format is compatible with readers that understand [...]"
             unsigned buf, :lKey, 32, ""
             unsigned buf, :Envr, 8, "18 Environment in which file was created 0 created by Word for [...]"
