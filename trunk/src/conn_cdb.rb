@@ -81,7 +81,7 @@ module CONN_CDB
     end
 
     def crash?
-        qc_all.join=~/second chance/
+        qc_all.join=~/EXCEPTION_TYPE:STATUS_ACCESS_VIOLATION/
     end
 
 
