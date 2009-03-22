@@ -45,7 +45,7 @@ begin
             end
         }
         print '*';$stdout.flush
-        sleep(10)
+        sleep(6)
         delete_temp_files
     end
 rescue

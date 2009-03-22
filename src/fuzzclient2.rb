@@ -153,12 +153,12 @@ module FuzzClient
             # Attach debugger
             # -snul - don't load symbols
             # -c  - initial command
-            # sxe -c "r;g" av - run the command 'r;g' whenever an av is hit (including first chance) 
+            # sxe -c "!exploitable -m;g" av - run the MS !exploitable windbg extension
             # -hd don't use the debug heap
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
             # -x ignore first chance av exceptions
             # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;!exploitable -m;g\\\" av;!load winext\\msec.dll;g\" -hd -x -xi ld -p #{current_pid}")
+            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"!exploitable -m;g\\\" av;!load winext\\msec.dll;g\" -hd -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
                 status=:success
