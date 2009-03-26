@@ -209,9 +209,8 @@ class Fuzzer
                 end
                 inject_data(current_field, overflow_maxlen, fuzzlevel) do |chunk|
                     chunk=(current_field.to_s+chunk).unpack('B*').join
-                    inject_field=Fields::StringField.new(chunk,'injected',chunk.length*8,"injected by fuzzer",nil,@binstruct.endianness)
+                    inject_field=Fields::StringField.new(chunk,'injected',chunk.length,"injected by fuzzer",nil,@binstruct.endianness)
                     @binstruct.replace(current_field,inject_field)
-
                     if send_unfixed || @fixups.empty?
                         if count >= skip
                             puts @binstruct.inspect[@binstruct.flatten.index(inject_field)] if @verbose
@@ -293,9 +292,9 @@ if __FILE__==$0
     require 'fuzzer'
     require 'wordstruct'
     b=WordStructures::WordSPRM.new("\x01\x08\x01")
-    f=Fuzzer.new(b)
+    bs=BinStruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
+    f=Fuzzer.new(bs)
     b.deep_each {|f| p f.name}
     #f.preserve_length=true
-    f.basic_tests {|t| p t}
-
+    f.basic_tests(10,false) {|t| p t}
 end
