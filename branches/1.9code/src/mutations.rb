@@ -40,7 +40,7 @@ module Mutations
         gJunk=create_string_generator([*0..255].map(&:chr),maxlen)
         gLetters=create_string_generator(['p'],maxlen)
         gRegexp=create_string_generator(%w(/ ^ * . [ ] $ + @ ? 1 2 3 4 ( ) \\ ` '),maxlen)
-        gFormat=create_string_generator(%w(%s %n %x),maxlen)
+        gFormat=create_string_generator(%w(%s %n %x 3 13 37),maxlen)
         gTokens=create_string_generator([' ',"\t","\n",':',';',','],maxlen)
         gFinal=Generators::Chain.new(gLetters,gFormat,gTokens,gRegexp,gJunk)
         gFinal
@@ -63,7 +63,7 @@ module Mutations
         if field.length_type=="fixed" or maxlen==0
             # for fields > 8 bits, just test the corner cases
             if field.length > 8
-                # This should be a signed or unsigned integer.
+                # If length is fixed, this should be a signed or unsigned integer.
                 # We're actually using RollingCorrupt, which was designed for strings, because it gives
                 # us the ability to add random cases and also it adds and subtracts 1..9 from the initial
                 # value, as well as doing the binary corner cases.   
@@ -80,7 +80,7 @@ module Mutations
                 g=Generators::Chain.new(rc1,rc2)
             else
                 chopper=Generators::Chop.new(field.to_s)
-                rep=Generators::Repeater.new(field.to_s,0,0,maxlen,proc {|a| a.to_s})
+                rep=Generators::Repeater.new(field.to_s,0,0,maxlen/field.to_s.length,proc {|a| a.join})
                 g=Generators::Chain.new(rc1,rc2,rep,chopper)
             end
         else
@@ -117,16 +117,17 @@ module Mutations
             yield g.next
         end
     end #inject_data
+    module_function :inject_data
 
 end
 
 if __FILE__==$0
     require 'binstruct'
     require 'generators'
-    bs=BinStruct.new("\x02\x01") {|buf| endian :little;unsigned buf, :foo, 16, "thing"}
+    bs=BinStruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
     a=[]
     bs.fields.each {|f|
-        Mutations.replace_field(f,1024,1,true,8) {|val| a << val}
+        Mutations.inject_data(f,10,2) {|val| a << val}
     }
     p a
     g=Mutations.create_string_generator(['a','b'],100)

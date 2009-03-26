@@ -100,7 +100,7 @@ class BinStruct
         buffer.replace @bitbuf.scan(/.{8}/).map {|e| e.to_i(2).chr}.join unless buffer.nil?
     end
     #----------------INSTANCE----------------------
-    def[]( sym )
+    def []( sym )
         # return an object, specified by symbol. May be a field or a substruct.
         # not designed for bitfields, since they're supposed to be invisible
         # containers.

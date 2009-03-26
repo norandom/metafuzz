@@ -247,7 +247,7 @@ module Fields
             unpadded=value <= 0 ? (("1"+"0"*@length).to_i(2)-value.abs).to_s(2) : value.to_s(2)
             value="0"*(@length-unpadded.length)+unpadded # left pad with zeroes to full length
             if self.endianness==:little
-                if value.length > 8 && value.length % 8 ==0
+                if value.length > 8 && value.length % 8==0
                     value=value.scan(/.{8}/).reverse.join
                 end
             end
