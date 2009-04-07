@@ -10,6 +10,10 @@ module Generators
         def next?
             @alive
         end
+        
+        def finished?
+            not @alive
+        end
 
         def next
             @current=@cache
