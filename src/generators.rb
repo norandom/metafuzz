@@ -1,3 +1,5 @@
+require 'digest/md5'
+
 module Generators
     class NewGen
 
@@ -256,6 +258,35 @@ module Generators
 
         def rewind
             @generators.each {|g| g.rewind}
+            super
+        end
+    end
+
+    class DuplicateFilter < NewGen
+
+        def hash( item )
+            Digest::MD5.hexdigest(String(item))
+        end
+
+        def initialize( gen )
+            @generator=gen
+            @seen=Hash.new(false)
+            @limit=10000
+            @block=Fiber.new do
+                until @generator.finished?
+                    this_value=gen.next
+                    Fiber.yield( this_value ) unless @seen[hash(this_value)]
+                    @seen[hash(this_value)]=true
+                    @seen.shift if @seen.length > @limit
+                end
+                false
+            end
+            @alive=false unless gen.respond_to?(:alive?) && gen.alive?
+            super
+        end
+
+        def rewind
+            @generator.rewind
             super
         end
     end
