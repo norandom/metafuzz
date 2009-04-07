@@ -1,6 +1,6 @@
 #The main point of interest of this module are the two hashes Injection_Generators and Replacement_Generators which 
 #allow users to create custom blocks of fuzzing code that will be run for fields of a certain type. Want to run the cool
-#x509 fuzzing code you just wrote and define an x509 field for use within BinStruct? Just add the code as a proc to these hashes
+#x509 fuzzing code you just wrote and define an x509 field for use within Binstruct? Just add the code as a proc to these hashes
 #and add a new Fields::Field subclass to the Fields module.
 #
 #If your new field type is Fields::FooField you do it like this:
@@ -124,7 +124,7 @@ end
 if __FILE__==$0
     require 'binstruct'
     require 'generators'
-    bs=BinStruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
+    bs=Binstruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
     a=[]
     bs.fields.each {|f|
         Mutations.inject_data(f,10,2) {|val| a << val}
