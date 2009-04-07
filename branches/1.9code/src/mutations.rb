@@ -74,14 +74,21 @@ module Mutations
                 g=Generators::Repeater.new((0..(2**field.length)-1),1,1,1,proc {|a| a.pack('c')})
             end
         elsif field.length_type=="variable"
-            rc1=Generators::RollingCorrupt.new(field.to_s,16,16,random_cases,field.endianness)
-            rc2=Generators::RollingCorrupt.new(field.to_s,32,32,random_cases,field.endianness)
-            if preserve_length
+            if field.length < 16
+                g=Generators::RollingCorrupt.new(field.to_s,8,8,random_cases,field.endianness)
+            elsif field.length < 32
+                g=Generators::RollingCorrupt.new(field.to_s,16,16,random_cases,field.endianness)
+            else
+                rc1=Generators::RollingCorrupt.new(field.to_s,16,16,random_cases,field.endianness)
+                rc2=Generators::RollingCorrupt.new(field.to_s,32,32,random_cases,field.endianness)
                 g=Generators::Chain.new(rc1,rc2)
+            end
+            if preserve_length
+                g
             else
                 chopper=Generators::Chop.new(field.to_s)
                 rep=Generators::Repeater.new(field.to_s,0,0,maxlen/field.to_s.length,proc {|a| a.join})
-                g=Generators::Chain.new(rc1,rc2,rep,chopper)
+                Generators::Chain.new(g,rep,chopper)
             end
         else
             raise RuntimeError, "Mutations::replace_field: Unknown length type #{field.length_type}"
