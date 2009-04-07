@@ -48,14 +48,14 @@ class Producer < Generators::NewGen
             while raw_old.length > 0
                 dgg_parsed_old << WordStructures::WordDgg.new(raw_old)
                 if raw_old.length > 0
-                    dgg_parsed_old << BinStruct.new(raw_old.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
+                    dgg_parsed_old << Binstruct.new(raw_old.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
                 end
             end
             dgg_parsed_new=[]
             while raw_new.length > 0
                 dgg_parsed_new << WordStructures::WordDgg.new(raw_new)
                 if raw_new.length > 0
-                    dgg_parsed_new << BinStruct.new(raw_new.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
+                    dgg_parsed_new << Binstruct.new(raw_new.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
                 end
             end
             dgg_parsed_old.zip(dgg_parsed_new) {|oldbs,newbs|
@@ -114,7 +114,7 @@ class Producer < Generators::NewGen
                     while fuzzcopy.length > 0
                         dgg_parsed << WordStructures::WordDgg.new(fuzzcopy)
                         if fuzzcopy.length > 0
-                            dgg_parsed << BinStruct.new(fuzzcopy.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
+                            dgg_parsed << Binstruct.new(fuzzcopy.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
                         end
                     end
                 rescue

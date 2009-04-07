@@ -1,4 +1,4 @@
-#If you add new Field subclasses, you need to name them with a capitalized 'Field' at the end, eg CrazyField, and use it in BinStruct by declaring the
+#If you add new Field subclasses, you need to name them with a capitalized 'Field' at the end, eg CrazyField, and use it in Binstruct by declaring the
 #first half in lower case. Like this:
 # module Fields
 # 	class CrazyField < StringField
@@ -6,20 +6,12 @@
 # 	end
 # end
 #
-# class MyStruct < BinStruct
+# class MyStruct < Binstruct
 # 	crazy :field_name, 32, "A Crazy Field!"
 #	[...]
 #
-#You can then define new procs for custom fuzzing of your new field type in Mutations
-#
 #Take a look at the documentation for Fields::Field for some other guidlines on creating new Field subclasses that can't trivially
 #inherit one of the base classes like Fields::StringField or Fields::HexstringField.
-#
-# ---
-# Author: Ben Nagy
-# Copyright: Copyright (c) Ben Nagy, 2006.
-# License: All components of this framework are licensed under the Common Public License 1.0. 
-# Please read LICENSE.TXT for details. Or see RDoc for the file license.rb
 module Fields
 
     #Subclasses of Fields::Field should probably at least overload <tt>input_to_bitstring</tt> and <tt>get_value</tt> and
@@ -123,6 +115,7 @@ module Fields
 
     end # Field
 
+    #Accepts negative numbers on assignment, but stores them as 2s complement.
     class UnsignedField < Field
 
         def initialize *args
@@ -162,6 +155,7 @@ module Fields
 
     end #UnsignedField
 
+    #For IP addresses etc
     class OctetstringField < Field
 
         def initialize(*args)
@@ -193,6 +187,7 @@ module Fields
     end #OctetstringField
 
 
+    #For getting and setting via hex strings.
     class HexstringField < Field
 
         def initialize *args
@@ -291,6 +286,7 @@ module Fields
         end
     end # StringField
 
+    #For getting and setting via binary strings
     class BitstringField < Field
 
         def initialize *args

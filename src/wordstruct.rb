@@ -1,7 +1,7 @@
 require 'binstruct'
 module WordStructures
 
-    class WordSPRM < BinStruct
+    class WordSPRM < Binstruct
         attr_reader :length_check
         parse {|buf|
             spra_table={0=>1,1=>1,2=>2,3=>4,4=>2,5=>2,6=>:variable,7=>3}
@@ -25,7 +25,7 @@ module WordStructures
         }
     end
 
-    class WordDgg < BinStruct
+    class WordDgg < Binstruct
         parse{ |bitbuf|
             endian :little
             bitfield(bitbuf, 16) do |buf|
@@ -52,7 +52,7 @@ module WordStructures
         }
     end
 
-    class StructuredStorageHeader < BinStruct
+    class StructuredStorageHeader < Binstruct
         parse{|buf|
             endian :little
             hexstring buf, :sig, 8*8,	"Signature"
@@ -77,7 +77,7 @@ module WordStructures
         }
     end
 
-    class WordFIB < BinStruct
+    class WordFIB < Binstruct
         parse {|buf|
 
             endian :little

@@ -10,7 +10,7 @@ require 'mutations'
 class Fuzzer
     include Mutations
     self.extend Mutations
-    # binstruct is a kind_of? BinStruct.
+    # binstruct is a kind_of? Binstruct.
     # *fixups is an array of Proc objects or lambdas which can do things like correct
     # lengths within the structure, calculate checksums and so forth. The fixups will
     # be applied cumulatively in the order specified. REMEMBER that the fixups need
@@ -29,19 +29,19 @@ class Fuzzer
         while strclone.length > 0
             chunk_array << strclone.slice!(0,chunk_size)
         end
-        raise RuntimeError, "Fuzzer: Data corruption while converting string to BinStruct" unless str==chunk_array.join
-        bstruct=BinStruct.new
+        raise RuntimeError, "Fuzzer: Data corruption while converting string to Binstruct" unless str==chunk_array.join
+        bstruct=Binstruct.new
         bstruct.endian=endian
         chunk_array.each {|elem|
             #add elem to bstruct
-            inject_field=Fields::StringField.new(elem.unpack('B*').join,'fromstr',elem.length*8,"String to BinStruct",nil,bstruct.endianness)
+            inject_field=Fields::StringField.new(elem.unpack('B*').join,'fromstr',elem.length*8,"String to Binstruct",nil,bstruct.endianness)
             bstruct.fields << inject_field
         }
         bstruct
     end
 
     def initialize(fuzztarget, *fixups)
-        unless fuzztarget.kind_of? String or fuzztarget.kind_of? BinStruct
+        unless fuzztarget.kind_of? String or fuzztarget.kind_of? Binstruct
             raise ArgumentError, "Fuzzer: Don't know how to fuzz #{fuzztarget.class}, only String and Binstruct"
         end
         if fuzztarget.kind_of? String
@@ -144,7 +144,7 @@ class Fuzzer
             #puts "Check passed."
 
             puts "starting delete" if @verbose
-            nulfield=BinStruct.new 
+            nulfield=Binstruct.new 
             unless @preserve_length
                 @binstruct.replace(current_field, nulfield)
                 unless @binstruct.to_s==@check
@@ -292,7 +292,7 @@ if __FILE__==$0
     require 'fuzzer'
     require 'wordstruct'
     b=WordStructures::WordSPRM.new("\x01\x08\x01")
-    bs=BinStruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
+    bs=Binstruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
     f=Fuzzer.new(bs)
     b.deep_each {|f| p f.name}
     #f.preserve_length=true
