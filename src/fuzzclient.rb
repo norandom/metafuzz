@@ -16,12 +16,14 @@ class FuzzClient < EventMachine::Connection
             :poll_interval=>5
         }
         @@config=default_config.merge config_hsh
-        @@config.each {|k,v|
-            define_method k do v end
-            define_method k.to_s+'=' do |new| @@config[k]=new end
-        }
-        unless File.directory? config[:work_dir]
-            print "Work directory #{config[:work_dir]} doesn't exist. Create it? [y/n]: "
+        class << self       
+          @@config.each {|k,v|
+             define_method k do v end
+             define_method k.to_s+'=' do |new| @@config[k]=new end
+          }
+        end
+        unless File.directory? @@config[:work_dir]
+            print "Work directory #{@@config[:work_dir]} doesn't exist. Create it? [y/n]: "
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
@@ -83,14 +85,14 @@ class FuzzClient < EventMachine::Connection
             :data=>"")
     end
 
-    def send_result(id, status, crash_details, fuzzdata)
+    def send_result(id, status, crash_details, fuzzfile)
         send_message(
             :verb=>:result,
             :station_id=>@@config[:agent_name],
             :id=>id,
             :status=>status,
             :data=>crash_details,
-            :crashdata=>(status==:crash ? fuzzdata : false))
+            :crashfile=>(status==:crash ? fuzzfile : false))
     end
 
     # Protocol Receive functions

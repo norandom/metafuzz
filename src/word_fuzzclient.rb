@@ -18,11 +18,11 @@ class WordFuzzClient < FuzzClient
     def prepare_test_file(data, msg_id)
         begin
             filename="test-"+msg_id.to_s+".doc"
-            path=File.join(@config["WORK DIR"],filename)
+            path=File.join(self.class.work_dir,filename)
             File.open(path, "wb+") {|io| io.write data}
             path
         rescue
-            raise RuntimeError, "Fuzzclient: Couldn't create test file #{fn} : #{$!}"
+            raise RuntimeError, "Fuzzclient: Couldn't create test file #{filename} : #{$!}"
         end
     end
 
@@ -61,12 +61,12 @@ class WordFuzzClient < FuzzClient
             # Attach debugger
             # -snul - don't load symbols
             # -c  - initial command
-            # sxe -c "r;g" av - run the command 'r;g' whenever an av is hit (including first chance) 
+            # sxe -c "!exploitable -m;g" av - run the MS !exploitable windbg extension
             # -hd don't use the debug heap
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
             # -x ignore first chance av exceptions
             # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;g\\\" av;g\" -hd -x -xi ld -p #{current_pid}")
+            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;!exploitable -m\\\" av;!load winext\\msec.dll;g\" -hd -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
                 status=:success
@@ -78,6 +78,7 @@ class WordFuzzClient < FuzzClient
                     status=:crash
                     sleep(0.1) while debugger.target_running?
                     crash_details=debugger.dq_all.join
+                    #File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                     # If the app has crashed we should kill the debugger, otherwise
                     # the app won't be killed without -9.
