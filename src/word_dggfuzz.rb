@@ -1,19 +1,13 @@
 require 'rubygems'
-require 'thread'
 require 'fuzzer'
-require 'diff/lcs'
 require 'wordstruct'
 require 'ole/storage'
-require 'mutations'
-require 'tempfile'
-require 'generators'
 
 class Producer < Generators::NewGen
 
     START_AT=0
 
-    Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
-    #Template=File.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/wordcrashes/boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
