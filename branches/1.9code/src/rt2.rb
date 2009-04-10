@@ -1,6 +1,6 @@
 require 'rtdbwrapper'
 
-class ResultTracker2
+class ResultTracker
 
     attr_reader :production_clients, :fuzz_clients
 

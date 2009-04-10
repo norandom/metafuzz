@@ -3,6 +3,7 @@ require 'eventmachine'
 require 'em_netstring'
 require 'fuzzprotocol'
 require 'fileutils'
+require 'objhax'
 
 class ProductionClient < EventMachine::Connection
 
@@ -15,19 +16,17 @@ class ProductionClient < EventMachine::Connection
             :poll_interval=>5,
             :production_generator=>Producer.new
         }
-        @@config=default_config.merge config_hsh
-        class << self       
-          @@config.each {|k,v|
-             define_method k do v end
-             define_method k.to_s+'=' do |new| @@config[k]=new end
-          }
-        end
-        unless File.directory? @@config[:work_dir]
-            print "Work directory #{@@config[:work_dir]} doesn't exist. Create it? [y/n]: "
+        @config=default_config.merge config_hsh
+        @config.each {|k,v|
+            meta_def k do v end
+            meta_def k.to_s+'=' do |new| @config[k]=new end
+        }
+        unless File.directory? @config[:work_dir]
+            print "Work directory #{@config[:work_dir]} doesn't exist. Create it? [y/n]: "
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
-                    Dir.mkdir(config[:work_dir])
+                    Dir.mkdir(@config[:work_dir])
                 rescue
                     raise RuntimeError, "ProdctionClient: Couldn't create directory: #{$!}"
                 end
@@ -35,44 +34,47 @@ class ProductionClient < EventMachine::Connection
                 raise RuntimeError, "ProductionClient: Work directory unavailable. Exiting."
             end
         end
-        @@idtracker=[]
-        @@case_id=0
+        @idtracker=[]
+        @case_id=0
+        class << self
+            attr_accessor :case_id, :idtracker
+        end
     end
-    
+
     def send_message( msg_hash )
-        self.reconnect(@@config[:server_ip],@@config[:server_port]) if self.error?
+        self.reconnect(self.class.server_ip,self.class.server_port) if self.error?
         send_data @handler.pack(FuzzMessage.new(msg_hash).to_yaml)
     end
 
     def send_test_case( tc, case_id )
-            send_message(
-                :verb=>:new_test_case,
-                :station_id=>@@config[:agent_name],
-                :id=>case_id,
-                :data=>tc
-            )
+        send_message(
+            :verb=>:new_test_case,
+            :station_id=>self.class.agent_name,
+            :id=>case_id,
+            :data=>tc
+        )
     end
 
     def send_client_bye
         send_message(
             :verb=>:client_bye,
             :client_type=>:production,
-            :station_id=>@@config[:agent_name],
+            :station_id=>self.class.agent_name,
             :data=>""
         )
     end
 
     def send_client_startup
-        puts "ProdClient: Trying to connect to #{@@config[:server_ip]} : #{@@config[:server_port]}" 
+        puts "ProdClient: Trying to connect to #{self.class.server_ip} : #{self.class.server_port}" 
         send_message(
-                :verb=>:client_startup,
-                :client_type=>:production,
-                :template=>false,
-                :station_id=>@@config[:agent_name],
-                :data=>""
+            :verb=>:client_startup,
+            :client_type=>:production,
+            :template=>false,
+            :station_id=>self.class.agent_name,
+            :data=>""
         )
         @initial_connect=EventMachine::DefaultDeferrable.new
-        @initial_connect.timeout(@@config[:poll_interval])
+        @initial_connect.timeout(self.class.poll_interval)
         @initial_connect.errback do
             puts "ProdClient: Connection timed out. Retrying."
             send_client_startup
@@ -82,7 +84,7 @@ class ProductionClient < EventMachine::Connection
     # Receive methods...
 
     def handle_ack_case( msg )
-        @@idtracker.delete msg.id rescue nil
+        self.class.idtracker.delete msg.id rescue nil
     end
 
     def handle_server_ready( msg )
@@ -91,9 +93,9 @@ class ProductionClient < EventMachine::Connection
             @initial_connect=false
         end
         if self.class.production_generator.next?
-            @@case_id+=1
-            @@idtracker << @@case_id
-            send_test_case self.class.production_generator.next, @@case_id
+            self.class.case_id+=1
+            self.class.idtracker << self.class.case_id
+            send_test_case self.class.production_generator.next, self.class.case_id
         else
             send_client_bye
             puts "All done, exiting."

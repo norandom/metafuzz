@@ -1,12 +1,7 @@
 require 'rubygems'
-require 'thread'
 require 'fuzzer'
-require 'diff/lcs'
 require 'wordstruct'
 require 'ole/storage'
-require 'mutations'
-require 'tempfile'
-require 'generators'
 require 'digest/md5'
 
 class Producer < Generators::NewGen
@@ -14,9 +9,7 @@ class Producer < Generators::NewGen
     START_AT=0
     SEEN_LIMIT=5000
 
-    Template=File.open( File.join(Config["WORK DIR"],"boof.doc"),"rb") {|io| io.read}
-    #Template=File.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb") {|io| io.read}
-    Template.freeze
+    Template=File.open( File.expand_path("~/wordcrashes/boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
@@ -28,11 +21,11 @@ class Producer < Generators::NewGen
         ret
     end
 
-    def recursive_cartprod( atom )
+    def recursive_cartprod( atom, &blk )
         if atom.is_a?(Binstruct) && atom[:contents]
             check=atom.to_s
             check.freeze
-            fields=[:recType, :recInstance, :contents].map {|sym| bs[sym]}
+            fields=[:recType, :recInstance, :contents].map {|sym| atom[sym]}
             saved_values=fields.map {|field| field.get_value}
             a_type=["\x0b\xf0", "\x22\xf1", "\x0f\xf0", "\x0d\xf0"]
             instance=atom[:recInstance].to_s
@@ -55,7 +48,7 @@ class Producer < Generators::NewGen
             raise RuntimeError, "DggFuzz2: Data Corruption in cartesian product" unless atom.to_s==check
         end
         atom.each {|atom|
-            recursive_cartprod(atom) if atom.is_a? WordStructures::WordDgg
+            recursive_cartprod(atom, &blk) if atom.is_a? WordStructures::WordDgg
         }
     end
 
@@ -71,9 +64,9 @@ class Producer < Generators::NewGen
         @duplicate_check=Hash.new(false)
         @block=Fiber.new do
             begin
-                unmodified=StringIO.new(Template.clone)
-                header, raw_fib, rest=unmodifed.read(512),unmodified.read(1472),unmodified.read
-                raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
+                io=StringIO.new(Template.clone)
+                header, raw_fib, rest=io.read(512),io.read(1472),io.read
+                raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == Template
                 fib=WordStructures::WordFIB.new(raw_fib.clone)
                 raise RuntimeError, "Data Corruption - fib.to_s not raw_fib" unless fib.to_s == raw_fib
                 # Open the file, get a copy of the table stream
@@ -106,20 +99,20 @@ class Producer < Generators::NewGen
                 raise RuntimeError, "Data Corruption - parsed.join not fuzztarget" unless dgg_parsed.join == fuzztarget
                 dgg_parsed.each {|toplevel_struct|
                     next unless toplevel_struct.is_a? WordStructures::WordDgg
-                    recursive_cartprod(toplevel_struct) {
+                    recursive_cartprod(toplevel_struct) do |fuzzed_struct|
                         # the struct pointed to by the entry in dgg_parsed
                         # has already been modified inside the cartprod
                         # function...
                         ts_gunk=dgg_parsed.join
                         next if seen? ts_gunk
                         fuzzed_table=ts_head+ts_gunk+ts_rest
-                        io.rewind
-                        Ole::Storage.open(io) {|ole|
-                            ole.file.open(fib.fWhichTblStm.to_s+"Table", "w+") {|f| f.write fuzzed_table}
+                        final=StringIO.new(Template.clone)
+                        Ole::Storage.open(final) {|ole|
+                            ole.file.open(fib.fWhichTblStm.to_s+"Table", "wb+") {|io| io.write fuzzed_table}
                         }
-                        io.rewind
-                        Fiber.yield io.read
-                    }
+                        final.rewind
+                        Fiber.yield final.read
+                    end 
                 }
             rescue
                 puts "Production failed: #{$!}";$stdout.flush
