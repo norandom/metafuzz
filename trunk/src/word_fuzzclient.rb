@@ -1,4 +1,4 @@
-require 'fuzzclient'
+require 'fuzz_client'
 require 'connector'
 require 'conn_office'
 require 'conn_cdb'
