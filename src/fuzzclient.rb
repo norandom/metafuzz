@@ -2,270 +2,134 @@ require 'rubygems'
 require 'eventmachine'
 require 'em_netstring'
 require 'fuzzprotocol'
-require 'connector'
-require 'conn_office'
-require 'conn_cdb'
-require 'diff/lcs'
 require 'fileutils'
-require 'win32/registry'
 
 
-default_config={"AGENT NAME"=>"CLIENT1",
-    "SERVER IP"=>"127.0.0.1",
-    "SERVER PORT"=>10000,
-    "WORK DIR"=>'C:\fuzzclient',
-    "CONFIG DIR"=>'C:\fuzzclient',
-    "POLL INTERVAL"=>5
-}
+class FuzzClient < EventMachine::Connection
 
-
-config_file=ARGV[0]
-if config_file and not File.exists? config_file
-    puts "FuzzClient: Bad config file #{config_file}, using default config."
-    config=default_config
-elsif not config_file
-    if File.exists?(File.join(default_config["CONFIG DIR"],"fuzzserver_config.txt"))
-        puts "FuzzClient: Loading from default config file."
-        config_data=File.open(File.join(default_config["CONFIG DIR"],"fuzzclient_config.txt"), "r") {|io| io.read}
-        config=YAML::load(config_data)
-    else
-        puts "Fuzzserver: Using default config."
-        config=default_config
-    end
-else
-    begin
-        config_data=File.open(config_file, "r") {|io| io.read}
-        config=YAML::load(config_data)
-    rescue
-        puts "FuzzClient: Bad config file #{config_file}, using default config."
-        config=default_config
-    end
-end
-
-["CONFIG DIR","WORK DIR"].each { |dirname|
-    unless File.directory? config[dirname]
-        print "Directory #{dirname} doesn't exist. Create it? [y/n]: "
-        answer=STDIN.gets.chomp
-        if answer =~ /^[yY]/
-            begin
-                Dir.mkdir(config[dirname])
-                if dirname=="CONFIG DIR"
-                    print "Saving config to #{config["CONFIG DIR"]}..."
-                    begin
-                        File.open(File.join(config["CONFIG DIR"],"fuzzclient_config.txt"),"w+") { |io|
-                            io.write(YAML::dump(config))
-                        }
-                    rescue
-                        puts "FuzzClient: Couldn't write out config."
-                    end
-                end
-            rescue
-                raise RuntimeError, "FuzzClient: Couldn't create directory: #{$!}"
-            end
-        else
-            raise RuntimeError, "FuzzClient: #{dirname} unavailable. Exiting."
-        end
-    end
-}
-
-at_exit {
-    print "Saving config to #{config["CONFIG DIR"]}..."
-    begin
-        File.open(File.join(config["CONFIG DIR"],"fuzzclient_config.txt"),"w+") { |io|
-            io.write(YAML::dump(config))
+    def self.setup( config_hsh={})
+        default_config={
+            :agent_name=>"CLIENT1",
+            :server_ip=>"127.0.0.1",
+            :server_port=>10001,
+            :work_dir=>File.expand_path('~/fuzzclient'),
+            :poll_interval=>5
         }
-    rescue
-        puts "FuzzClient: Couldn't write out config."
-    end
-    print "Done. Exiting.\n"
-}
-
-begin
-    Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
-        reg.delete_key "StartupItems" rescue nil
-        reg.delete_key "DisabledItems" rescue nil
-    end
-rescue
-    nil
-end
-
-
-module FuzzClient
-
-    def initialize(config)
-        @config=config
-    end
-
-    def send_client_shutdown
-        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT SHUTDOWN",
-            :station_id=>@config["AGENT NAME"],
-            :data=>""}).to_yaml)
-            send_data ready_msg
-    end
-
-    def send_client_startup
-        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT STARTUP",
-            :station_id=>@config["AGENT NAME"],
-            :data=>""}).to_yaml)
-            send_data ready_msg
-            @initial_connect=EventMachine::DefaultDeferrable.new
-            @initial_connect.timeout(@config["POLL INTERVAL"])
-            @initial_connect.errback do
-                puts "Fuzzclient: Connection timed out. Retrying."
-                send_client_startup
-            end
-    end
-
-    def send_client_ready
-        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT READY",
-            :station_id=>@config["AGENT NAME"],
-            :data=>""}).to_yaml)
-            send_data ready_msg
-    end
-
-    def send_result(data='')
-        self.reconnect(@config["SERVER IP"],@config["SERVER PORT"]) if self.error?
-        ready_msg=@handler.pack(FuzzMessage.new({
-            :verb=>"CLIENT RESULT",
-            :station_id=>@config["AGENT NAME"],
-            :data=>data}).to_yaml)
-            send_data ready_msg
-    end
-
-    def prepare_test_file(data, msg_id)
-        begin
-            filename="test-"+msg_id.to_s+".doc"
-            filename=File.join(@config["WORK DIR"],filename)
-            fso=WIN32OLE.new("Scripting.FileSystemObject")
-            path=fso.GetAbsolutePathName(filename) # Sometimes paths with backslashes break things, the FSO always does things right.
-            fso.ole_free
-            File.open(path, "wb+") {|io| io.write data}
-            path
-        rescue
-            raise RuntimeError, "Fuzzclient: Couldn't create test file #{fn} : #{$!}"
-        end
-    end
-
-    def clean_up( fn )
-        10.times do
-            begin
-                FileUtils.rm_f(fn)
-                # TODO: Fix this, it doesn't quite work.
-                FileUtils.rm_f(fn.split('\\').map {|s| s=~/.*.doc/ ? '~$'+s.reverse[0..9].reverse : s}.join('\\'))
-            rescue
-                raise RuntimeError, "Fuzzclient: Failed to delete #{fn} : #{$!}"
-            end
-            return true unless File.exist? fn
-            sleep(0.1)
-        end
-        return false
-    end
-
-    def deliver(data,msg_id)
-        begin
-            status="ERROR"
-            this_test_filename=prepare_test_file(data, msg_id)
-            begin
-                5.times do
-                    begin
-                        @word=Connector.new(CONN_OFFICE, 'word')
-                        break
-                    rescue
-                        sleep(1)
-                        next
-                    end
+        @@config=default_config.merge config_hsh
+        @@config.each {|k,v|
+            define_method k do v end
+            define_method k.to_s+'=' do |new| @@config[k]=new end
+        }
+        unless File.directory? config[:work_dir]
+            print "Work directory #{config[:work_dir]} doesn't exist. Create it? [y/n]: "
+            answer=STDIN.gets.chomp
+            if answer =~ /^[yY]/
+                begin
+                    Dir.mkdir(config[:work_dir])
+                rescue
+                    raise RuntimeError, "FuzzClient: Couldn't create directory: #{$!}"
                 end
-                current_pid=@word.pid
-            rescue
-                raise RuntimeError, "Couldn't establish connection to app. #{$!}"
+            else
+                raise RuntimeError, "FuzzClient: Work directory unavailable. Exiting."
             end
-            # Attach debugger
-            # -snul - don't load symbols
-            # -hd don't use the debug heap
-            # -pb don't request an initial break
-            # -x ignore first chance exceptions
-            # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -hd -pb -x -xi ld -p #{current_pid}")
-            begin
-                @word.deliver this_test_filename
-                status="SUCCESS"
-                print '.';$stdout.flush
-            rescue
-                # check for crashes
-                sleep(0.1) # This magically seems to fix a race condition.
-                if debugger.crash?
-                    status="CRASH"
-                    File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
-                    print '!';$stdout.flush
-                    # If the app has crashed we should kill the debugger, otherwise
-                    # the app won't be killed without -9.
-                    debugger.close
-                else
-                    status="FAIL"
-                    print '#';$stdout.flush
-                end
-            end
-            # close the debugger and kill the app
-            # This should kill the winword process as well
-            # Clean up the connection object
-            @word.close rescue nil
-            debugger.close 
-            clean_up(this_test_filename) 
-            status
-        rescue
-            raise RuntimeError, "Delivery: fatal: #{$!}"
-            # ask the server to revert me to my snapshot?
         end
     end
 
     def post_init
         @handler=NetStringTokenizer.new
-        @sent=0
-        @template=""
         puts "FuzzClient: Starting up..."
         send_client_startup
-        at_exit {send_client_shutdown}
+    end
+
+    def deliver(data,msg_id)
+        # Deliver the test here, return the status and any extended
+        # crash data (eg debugger output). Currently, the harness
+        # uses :success, :fail, :crash and :error
+        [:success, ""]
+    end
+
+    # Protocol Send functions
+
+    def send_message( msg_hash )
+        self.reconnect(@@config[:server_ip],@@config[:server_port]) if self.error?
+        send_data @handler.pack(FuzzMessage.new(msg_hash).to_yaml)
+    end
+
+    def send_client_bye
+        send_message(
+            :verb=>:client_bye,
+            :station_id=>@@config[:agent_name],
+            :data=>"")
+    end
+
+    def send_client_startup
+        @initial_connect=EventMachine::DefaultDeferrable.new
+        @initial_connect.timeout(@@config[:poll_interval])
+        @initial_connect.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_startup
+        end
+        send_message(
+            :verb=>:client_startup,
+            :station_id=>@@config[:agent_name],
+            :client_type=>:fuzz,
+            :data=>"")
+    end
+
+    def send_client_ready
+        send_message(
+            :verb=>:client_ready,
+            :station_id=>@@config[:agent_name],
+            :data=>"")
+    end
+
+    def send_result(id, status, crash_details, fuzzdata)
+        send_message(
+            :verb=>:result,
+            :station_id=>@@config[:agent_name],
+            :id=>id,
+            :status=>status,
+            :data=>crash_details,
+            :crashdata=>(status==:crash ? fuzzdata : false))
+    end
+
+    # Protocol Receive functions
+
+    def handle_deliver( msg )
+        fuzzdata=msg.data
+        begin
+            status,crash_details=deliver(fuzzdata,msg.id)
+        rescue
+            status=:error
+            EventMachine::stop_event_loop
+            raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
+        end
+        send_result msg.id, status, crash_details, fuzzdata
+        send_client_ready
+    end
+
+    def handle_server_ready( msg )
+        if @initial_connect
+            @initial_connect.succeed
+            @initial_connect=false
+        end
+        send_client_ready
+    end
+
+    def handle_server_bye( msg )
+        puts "FuzzClient: Server is finished."
+        send_client_bye
+        EventMachine::stop_event_loop
+    end
+
+    def method_missing( meth, *args )
+        raise RuntimeError, "Unknown Command: #{meth.to_s}!"
     end
 
     def receive_data(data)
         @handler.parse(data).each {|m| 
             msg=FuzzMessage.new(m)
-            case msg.verb
-            when "DELIVER"
-                #fuzzfile=Diff::LCS.patch(@template,msg.data)
-                fuzzfile=msg.data
-                begin
-                    status=deliver(fuzzfile,msg.id)
-                rescue
-                    status="ERROR"
-                    puts $!
-                    EventMachine::stop_event_loop
-                    raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
-                end
-                send_result "#{msg.id}:#{status}"
-                send_client_ready
-            when "SERVER FINISHED"
-                puts "FuzzClient: Server is finished."
-                send_client_shutdown
-                EventMachine::stop_event_loop
-            when "TEMPLATE"
-                @initial_connect.succeed
-                @template=msg.data
-                send_client_ready
-            else
-                raise RuntimeError, "Unknown Command!"
-            end
+            self.send("handle_"+msg.verb.to_s, msg)
         }
     end
 end
-
-EventMachine::run {
-    EventMachine::connect(config["SERVER IP"],config["SERVER PORT"], FuzzClient, config)
-}
-puts "Event loop stopped. Shutting down."
