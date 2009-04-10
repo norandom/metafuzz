@@ -4,7 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'diff/lcs'
 require 'ole/storage'
-require 'rt2'
+require 'result_tracker'
 require 'objhax'
 
 class TestCase < EventMachine::DefaultDeferrable
