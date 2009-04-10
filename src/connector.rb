@@ -1,4 +1,4 @@
-require 'objhax'
+require 'connector/objhax'
 require 'thread'
 
 #The Connector class is a generic interface to sending and receiving
