@@ -86,7 +86,7 @@ class Binstruct
 
     #fieldtype builders
     Fields::Field_Subtypes.each {|fieldname|
-        field_klass=Fields.const_get(fieldname.capitalize.to_s+"Field")
+        field_klass=Fields.const_get(String(fieldname).capitalize.to_s+"Field")
         define_method fieldname do |*args|
             bitbuf, name, len, desc=args
             @fields << thisfield=field_klass.new(bitbuf.slice!(0,len),name,len,desc,nil,@endian||:big)
