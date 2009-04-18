@@ -18,7 +18,22 @@ end
 
 class FuzzServer < EventMachine::Connection
 
-    QUEUE_SIZE_LIMIT=20
+    WaitQueue=[]
+    DeliveryQueue=[]
+    class << DeliveryQueue
+        def finished?
+            @finished||=false
+        end
+        def finish
+            @finished=true
+        end
+    end
+    def self.waiting_for_data
+        WaitQueue
+    end
+    def self.delivery_queue
+        DeliveryQueue
+    end
 
     def self.setup( config_hsh={})
         default_config={
@@ -26,8 +41,7 @@ class FuzzServer < EventMachine::Connection
             :server_ip=>"0.0.0.0",
             :server_port=>10001,
             :work_dir=>File.expand_path('~/fuzzserver/data'),
-            :poll_interval=>5,
-            :database_filename=>"metafuzz.db"
+            :database_filename=>"/dev/shm/metafuzz.db"
         }
         @config=default_config.merge config_hsh
         @config.each {|k,v|
@@ -47,29 +61,14 @@ class FuzzServer < EventMachine::Connection
                 raise RuntimeError, "ProductionClient: Work directory unavailable. Exiting."
             end
         end
-
-        prod_queue=[]
-        class << prod_queue
-            def finished?
-                @finished||=false
-            end
-            def finish
-                @finished=true
-            end
-        end
-
-        @waiting_for_data=[]
-        @delivery_queue=prod_queue
-        @result_tracker=ResultTracker.new(File.join(self.work_dir,self.database_filename))
-        class << self
-            attr_reader :delivery_queue, :result_tracker, :waiting_for_data
+        @RT=ResultTracker.new(self.database_filename)
+        def self.result_tracker
+            @RT
         end
     end
 
-    def initialize *args
+    def post_init
         @handler=NetStringTokenizer.new
-        puts "FuzzServer: Starting up..."
-        super
     end
 
     def send_msg( msg_hash )
@@ -90,21 +89,17 @@ class FuzzServer < EventMachine::Connection
 
     # Only comes from fuzzclients.
     def handle_client_ready( msg )
-        if self.class.delivery_queue.empty? and self.class.delivery_queue.finished?
-            send_msg(:verb=>:server_bye)
+        unless self.class.delivery_queue.empty?
+            id,test_case=self.class.delivery_queue.shift
+            send_msg(:verb=>:deliver,:data=>test_case.data,:id=>id)
+            test_case.get_new_case
         else
-            unless self.class.delivery_queue.empty?
-                id,test_case=self.class.delivery_queue.shift
+            waiter=EventMachine::DefaultDeferrable.new
+            waiter.callback do |id, test_case|
                 send_msg(:verb=>:deliver,:data=>test_case.data,:id=>id)
                 test_case.get_new_case
-            else
-                waiter=EventMachine::DefaultDeferrable.new
-                waiter.callback do |id, test_case|
-                    send_msg(:verb=>:deliver,:data=>test_case.data,:id=>id)
-                    test_case.get_new_case
-                end
-                self.class.waiting_for_data << waiter
             end
+            self.class.waiting_for_data << waiter
         end
     end
 
@@ -115,15 +110,13 @@ class FuzzServer < EventMachine::Connection
 
     def handle_new_test_case( msg )
         server_id=self.class.result_tracker.check_out
-        send_msg(:verb=>:ack_case, :id=>msg.id, :server_id=>server_id)
         test_case=TestCase.new(msg.data)
         test_case.callback do
-            send_msg(:verb=>:server_ready)
+            send_msg(:verb=>:ack_case, :id=>msg.id)
+            send_msg(:verb=>:server_ready,:server_id=>server_id)
         end
         if waiting=self.class.waiting_for_data.shift
             waiting.succeed(server_id,test_case)
-            # We're not keeping up, get a spare.
-            send_msg(:verb=>:server_ready) unless self.class.delivery_queue.size > QUEUE_SIZE_LIMIT
         else
             self.class.delivery_queue << [server_id, test_case]
         end

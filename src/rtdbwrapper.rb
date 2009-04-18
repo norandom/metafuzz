@@ -34,25 +34,23 @@ class RTDB
     end
 
     def count_results
-         @db[:crash_results].filter('result > 0').count 
+        @db[:crash_results].filter('result > 0').count 
     end
 
     def result_summary
-        
-        grouped=@db[:crash_results].group_and_count(:result)
-        @current_count=@db[:crash_results].filter('result > 0').count
+        @current_count=@db[:crash_results].count
         @old_count||=@current_count
         @old_time||=Time.now
         summary={}
+        summary[:speed]="%.2f" % ((@current_count-@old_count) / (Time.now - @old_time).to_f)
         summary[:total]=@current_count
+        grouped=@db[:crash_results].group_and_count(:result)
         summary[:success]=grouped[:result=>Translate[:success]][:count] rescue 0 
         summary[:fail]=grouped[:result=>Translate[:fail]][:count] rescue 0
         summary[:crash]=grouped[:result=>Translate[:crash]][:count] rescue 0
-        summary[:speed]="%.2f" % ((@current_count-@old_count) / (Time.now - @old_time).to_f)
         @old_count=@current_count
         @old_time=Time.now
         summary
-        
     end
 
     def results_outstanding
@@ -60,49 +58,47 @@ class RTDB
     end
 
     def result_for_id(id)
-         @db[:crash_results][:id=>id]  # A hash
+        @db[:crash_results][:id=>id]  # A hash
     end
 
     def crashfile_for_id(id)
-         @db[:crash_files][:crash_id=>id][:crashfile_path] # Path as string
+        @db[:crash_files][:crash_id=>id][:crashfile_path] # Path as string
     end
 
     def crashdetail_for_id(id)
-         @db[:crash_files][:crash_id=>id][:crashdetail_path] # Path as string
+        @db[:crash_files][:crash_id=>id][:crashdetail_path] # Path as string
     end
 
     def insert_result(id, result_sym, crashdetail_path=nil, crashfile_path=nil)
-        
-            unless Translate[@db[:crash_results][:id=>id][:result]]==:checked_out
-                raise RuntimeError, "RTDB: Result #{id} not checked out."
-            else
-                begin
-                    @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
-                rescue
-                    sleep 1
-                    @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
-                end
-                if result_sym==:crash
-                    unless crashdetail_path && crashfile_path
-                        raise RuntimeError, "RTDB: crash, but no details!"
+        unless Translate[@db[:crash_results][:id=>id][:result]]==:checked_out
+            raise RuntimeError, "RTDB: Result #{id} not checked out."
+        else
+            begin
+                @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
+            rescue
+                sleep 1
+                @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
+            end
+            if result_sym==:crash
+                unless crashdetail_path && crashfile_path
+                    raise RuntimeError, "RTDB: crash, but no details!"
+                else
+                    unless File.exists?(crashdetail_path) && File.exists?(crashfile_path)
+                        raise RuntimeError, "RTDB: Invalid path"
                     else
-                        unless File.exists?(crashdetail_path) && File.exists?(crashfile_path)
-                            raise RuntimeError, "RTDB: Invalid path"
-                        else
-                            begin
-                                @db[:crash_files].insert(:crashdetail_path=>crashdetail_path,:crashfile_path=>crashfile_path,:crash_id=>id)
-                            rescue
-                                sleep 1
-                                @db[:crash_files].insert(:crashdetail_path=>crashdetail_path,:crashfile_path=>crashfile_path,:crash_id=>id)
-                            end
+                        begin
+                            @db[:crash_files].insert(:crashdetail_path=>crashdetail_path,:crashfile_path=>crashfile_path,:crash_id=>id)
+                        rescue
+                            sleep 1
+                            @db[:crash_files].insert(:crashdetail_path=>crashdetail_path,:crashfile_path=>crashfile_path,:crash_id=>id)
                         end
                     end
                 end
             end
-        
+        end
     end
 
     def check_out
-         @db[:crash_results].insert(:result=>0,:timestamp=>Time.now)  # returns the primary key
+        @db[:crash_results].insert(:result=>0,:timestamp=>Time.now)  # returns the primary key
     end
 end

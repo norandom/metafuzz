@@ -25,23 +25,23 @@ class Producer < Generators::NewGen
         if atom.is_a?(Binstruct) && atom[:contents]
             check=atom.to_s
             check.freeze
-            fields=[:recType, :recInstance, :contents].map {|sym| atom[sym]}
+            fields=[:recType, :recLen, :recInstance, :contents].map {|sym| atom[sym]}
             saved_values=fields.map {|field| field.get_value}
             a_type=["\x0b\xf0", "\x22\xf1", "\x0f\xf0", "\x0d\xf0"]
             instance=atom[:recInstance].to_s
             a_instance=Generators::RollingCorrupt.new(instance,instance.length*8,instance.length*8,0,:little).to_a.uniq
             contents=atom[:contents]
-            rc1=Generators::RollingCorrupt.new(contents.to_s,7,3,32,:little)
-            rc2=Generators::RollingCorrupt.new(contents.to_s,5,5,16,:little)
-            rc3=Generators::RollingCorrupt.new(contents.to_s,13,5,32,:little)
-            g_contents=Generators::Chain.new(rc1,rc2,rc3)
-            cartprod=Generators::Cartesian.new(a_type, a_instance, g_contents)
+            rc1=Generators::RollingCorrupt.new(contents.to_s,16,16,0,:little)
+            rc2=Generators::RollingCorrupt.new(contents.to_s,32,32,0,:little)
+            g_contents=Generators::Chain.new(rc1,rc2)
+            rec_len=atom[:recLen].to_s
+            a_rec_len=Generators::RollingCorrupt.new(rec_len,rec_len.length*8,rec_len.length*8,0,:little).to_a.uniq
+            cartprod=Generators::Cartesian.new(a_type, a_rec_len, a_instance, g_contents)
             while cartprod.next?
                 new_values=cartprod.next
                 fields.zip(new_values) {|field,new_value| field.set_raw(new_value.unpack('B*').join[-field.length..-1])}
-                puts "---cartprod start---"
-                fields.each {|f| puts atom.inspect[atom.flatten.index(f)]}
-                puts "---cartprod finish---" 
+                #fields.each {|f| puts atom.inspect[atom.flatten.index(f)]}
+                print '.';$stdout.flush
                 yield 
             end
             fields.zip(saved_values) {|field,saved_value| field.set_value saved_value}

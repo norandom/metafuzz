@@ -18,13 +18,9 @@ WordFuzzServer.setup
 
 EM.epoll
 EventMachine::run {
-    EM.add_periodic_timer(30) do 
-    if WordFuzzServer.delivery_queue.empty? 
-        and WordFuzzServer.delivery_queue.finished? 
-        and WordFuzzServer.result_tracker.fuzz_clients==0
-        puts "All done, shutting down."
-        EventMachine::stop_event_loop
-    end
+    EM.add_periodic_timer(5) do 
+        print "\rClients: #{EventMachine.connection_count}, Queue: #{WordFuzzServer.delivery_queue.size}"
+        print ", Waiting: #{WordFuzzServer.waiting_for_data.size}"
     end
 EventMachine::start_server(WordFuzzServer.server_ip, WordFuzzServer.server_port, WordFuzzServer)
 }
