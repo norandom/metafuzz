@@ -64,9 +64,9 @@ class FuzzClient < EventMachine::Connection
     end
 
     def send_client_startup
-        @initial_connect=EventMachine::DefaultDeferrable.new
-        @initial_connect.timeout(self.class.poll_interval)
-        @initial_connect.errback do
+        @waiting_for_server=EventMachine::DefaultDeferrable.new
+        @waiting_for_server.timeout(self.class.poll_interval)
+        @waiting_for_server.errback do
             puts "Fuzzclient: Connection timed out. Retrying."
             send_client_startup
         end
@@ -78,6 +78,12 @@ class FuzzClient < EventMachine::Connection
     end
 
     def send_client_ready
+        @waiting_for_server=EventMachine::DefaultDeferrable.new
+        @waiting_for_server.timeout(self.class.poll_interval)
+        @waiting_for_server.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_startup
+        end
         send_message(
             :verb=>:client_ready,
             :station_id=>self.class.agent_name,
@@ -97,6 +103,10 @@ class FuzzClient < EventMachine::Connection
     # Protocol Receive functions
 
     def handle_deliver( msg )
+        if @waiting_for_server
+            @waiting_for_server.succeed
+            @waiting_for_server=false
+        end
         fuzzdata=msg.data
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
@@ -110,9 +120,9 @@ class FuzzClient < EventMachine::Connection
     end
 
     def handle_server_ready( msg )
-        if @initial_connect
-            @initial_connect.succeed
-            @initial_connect=false
+        if @waiting_for_server
+            @waiting_for_server.succeed
+            @waiting_for_server=false
         end
         send_client_ready
     end

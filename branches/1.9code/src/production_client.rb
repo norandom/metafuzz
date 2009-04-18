@@ -13,7 +13,7 @@ class ProductionClient < EventMachine::Connection
             :server_ip=>"127.0.0.1",
             :server_port=>10001,
             :work_dir=>File.expand_path('~/prodclient'),
-            :poll_interval=>5,
+            :poll_interval=>60,
             :production_generator=>Producer.new
         }
         @config=default_config.merge config_hsh
@@ -35,9 +35,10 @@ class ProductionClient < EventMachine::Connection
             end
         end
         @idtracker=[]
+        @server_waits=[]
         @case_id=0
         class << self
-            attr_accessor :case_id, :idtracker
+            attr_accessor :case_id, :idtracker, :server_waits
         end
     end
 
@@ -53,6 +54,13 @@ class ProductionClient < EventMachine::Connection
             :id=>case_id,
             :data=>tc
         )
+        waiter=EventMachine::DefaultDeferrable.new
+        waiter.timeout(self.class.poll_interval)
+        waiter.errback do
+            puts "ProdClient: Connection timed out. Retrying ID #{case_id.to_s}"
+            send_test_case( tc, case_id )
+        end
+        self.class.server_waits << waiter
     end
 
     def send_client_bye
@@ -73,25 +81,23 @@ class ProductionClient < EventMachine::Connection
             :station_id=>self.class.agent_name,
             :data=>""
         )
-        @initial_connect=EventMachine::DefaultDeferrable.new
-        @initial_connect.timeout(self.class.poll_interval)
-        @initial_connect.errback do
+        waiter=EventMachine::DefaultDeferrable.new
+        waiter.timeout(self.class.poll_interval)
+        waiter.errback do
             puts "ProdClient: Connection timed out. Retrying."
             send_client_startup
         end
+        self.class.server_waits << waiter
     end
 
     # Receive methods...
 
     def handle_ack_case( msg )
-        self.class.idtracker.delete msg.id rescue nil
+        self.class.idtracker.delete msg.id
     end
 
     def handle_server_ready( msg )
-        if @initial_connect
-            @initial_connect.succeed
-            @initial_connect=false
-        end
+        self.class.server_waits.shift.succeed until self.class.server_waits.empty?
         if self.class.production_generator.next?
             self.class.case_id+=1
             self.class.idtracker << self.class.case_id
@@ -104,7 +110,7 @@ class ProductionClient < EventMachine::Connection
     end
 
     def handle_server_bye( msg )
-        puts "All done, exiting."
+        puts "Got server_bye, exiting."
         EventMachine::stop_event_loop
     end
 
