@@ -2,8 +2,6 @@ require 'rubygems'
 require 'eventmachine'
 require 'em_netstring'
 require 'fuzzprotocol'
-require 'diff/lcs'
-require 'ole/storage'
 require 'result_tracker'
 require 'objhax'
 
@@ -20,21 +18,12 @@ class FuzzServer < EventMachine::Connection
 
     WaitQueue=[]
     DeliveryQueue=[]
-    class << DeliveryQueue
-        def finished?
-            @finished||=false
-        end
-        def finish
-            @finished=true
-        end
-    end
     def self.waiting_for_data
         WaitQueue
     end
     def self.delivery_queue
         DeliveryQueue
     end
-
     def self.setup( config_hsh={})
         default_config={
             :agent_name=>"SERVER",
@@ -61,9 +50,11 @@ class FuzzServer < EventMachine::Connection
                 raise RuntimeError, "ProductionClient: Work directory unavailable. Exiting."
             end
         end
-        @RT=ResultTracker.new(self.database_filename)
+        # Class instance variables, shared across subclass instances
+        # but not between different subclasses.
+        @@result_tracker=ResultTracker.new(self.database_filename)
         def self.result_tracker
-            @RT
+            @@result_tracker
         end
     end
 
@@ -104,7 +95,6 @@ class FuzzServer < EventMachine::Connection
     end
 
     def handle_client_startup( msg )
-        self.class.result_tracker.send("add_"+msg.client_type.to_s+"_client")
         send_msg(:verb=>:server_ready)
     end
 
@@ -119,13 +109,6 @@ class FuzzServer < EventMachine::Connection
             waiting.succeed(server_id,test_case)
         else
             self.class.delivery_queue << [server_id, test_case]
-        end
-    end
-
-    def handle_client_bye( msg )
-        self.class.result_tracker.send("remove_"+msg.client_type.to_s+"_client")
-        if self.class.result_tracker.production_clients==0
-            self.class.delivery_queue.finish
         end
     end
 

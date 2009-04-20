@@ -19,8 +19,15 @@ WordFuzzServer.setup
 EM.epoll
 EventMachine::run {
     EM.add_periodic_timer(5) do 
-        print "\rClients: #{EventMachine.connection_count}, Queue: #{WordFuzzServer.delivery_queue.size}"
-        print ", Waiting: #{WordFuzzServer.waiting_for_data.size}"
+        @old_time||=Time.now
+        @old_total||=Integer(WordFuzzServer.result_tracker.summary[:current_count])
+        @total=Integer(WordFuzzServer.result_tracker.summary[:current_count])
+        print "\rClients: #{EventMachine.connection_count}, "
+        print "Waiting: #{WordFuzzServer.waiting_for_data.size}, "
+        print "Total: #{@total}, "
+        print "Speed: #{"%.2f" % ((@total-@old_total)/(Time.now-@old_time).to_f)}           "
+        @old_total=Integer(WordFuzzServer.result_tracker.summary[:current_count])
+        @old_time=Time.now
     end
 EventMachine::start_server(WordFuzzServer.server_ip, WordFuzzServer.server_port, WordFuzzServer)
 }

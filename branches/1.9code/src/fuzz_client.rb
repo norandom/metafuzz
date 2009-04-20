@@ -129,7 +129,6 @@ class FuzzClient < EventMachine::Connection
 
     def handle_server_bye( msg )
         puts "FuzzClient: Server is finished."
-        send_client_bye
         EventMachine::stop_event_loop
     end
 

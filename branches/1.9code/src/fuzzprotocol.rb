@@ -7,14 +7,14 @@ class FuzzMessage
     # below will also be added as getters and setters, making the protocol
     # self extending if both parties agree.
     def initialize(data)
-        @msghash={:verb=>'',:station_id=>'',:data=>'',:checksum=>''}
+        @msghash={:verb=>'',:station_id=>'',:data=>''}
         if data.class==String
             load_yaml(data)
         else
             unless data.class==Hash
                 raise ArgumentError, "FuzzMessage: .new takes a Hash or a YAML-dumped Hash."
             end
-            @msghash={:verb=>'',:station_id=>'',:data=>'',:checksum=>''}.merge! data
+            @msghash.merge! data
         end
         # Set up instance getters and setters for the hash symbols
         @msghash.each {|k,v|
@@ -50,14 +50,3 @@ class FuzzMessage
         YAML::dump(@msghash)
     end
 end
-
-=begin
-f=FuzzMessage.new({:verb=>"NEWDATA",:message=>"ELEPHANTS RULE"})
-dumped=f.to_yaml
-p dumped.class
-tst=YAML::load(dumped)
-p tst
-g=FuzzMessage.new(dumped)
-p g
-p g.message
-=end
