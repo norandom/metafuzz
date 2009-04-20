@@ -3,6 +3,8 @@ require 'sequel'
 
 class RTDB
 
+    attr_reader :summary
+
     Translate={0=>:checked_out,
         1=>:success,
         2=>:fail,
@@ -31,6 +33,13 @@ class RTDB
             column :crashfile_path, :string
             column :crash_id, :integer
         end unless @db.table_exists? :crash_files
+
+        @summary={}
+        @summary[:current_count]=@db[:crash_results].count
+        @grouped=@db[:crash_results].group_and_count(:result)
+        [:success,:crash,:fail].each {|sym|
+            @summary[sym]=Integer(@grouped[:result=>Translate[sym]][:count]) rescue 0
+        }
     end
 
     def count_results
@@ -38,19 +47,12 @@ class RTDB
     end
 
     def result_summary
-        @current_count=@db[:crash_results].count
-        @old_count||=@current_count
+        @old_count||=@summary[:current_count]
         @old_time||=Time.now
-        summary={}
-        summary[:speed]="%.2f" % ((@current_count-@old_count) / (Time.now - @old_time).to_f)
-        summary[:total]=@current_count
-        grouped=@db[:crash_results].group_and_count(:result)
-        summary[:success]=grouped[:result=>Translate[:success]][:count] rescue 0 
-        summary[:fail]=grouped[:result=>Translate[:fail]][:count] rescue 0
-        summary[:crash]=grouped[:result=>Translate[:crash]][:count] rescue 0
-        @old_count=@current_count
+        @summary[:speed]="%.2f" % ((@summary[:current_count]-@old_count) / (Time.now - @old_time).to_f)
+        @old_count=@summary[:current_count]
         @old_time=Time.now
-        summary
+        @summary
     end
 
     def results_outstanding
@@ -75,9 +77,13 @@ class RTDB
         else
             begin
                 @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
+                @summary[:current_count]+=1
+                @summary[result_sym]+=1
             rescue
                 sleep 1
                 @db[:crash_results][:id=>id]={:result=>Translate[result_sym],:timestamp=>Time.now}
+                @summary[:current_count]+=1
+                @summary[result_sym]+=1
             end
             if result_sym==:crash
                 unless crashdetail_path && crashfile_path

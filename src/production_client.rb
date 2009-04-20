@@ -110,6 +110,8 @@ class ProductionClient < EventMachine::Connection
     end
 
     def handle_server_bye( msg )
+        # In the current protocol, this isn't used, but may as well
+        # leave the handler around, just in case.
         puts "Got server_bye, exiting."
         EventMachine::stop_event_loop
     end
