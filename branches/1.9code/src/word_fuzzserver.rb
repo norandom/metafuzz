@@ -14,7 +14,7 @@ class WordFuzzServer < FuzzServer
     end
 end
 
-WordFuzzServer.setup
+WordFuzzServer.setup work_dir: "/fuzzfiles"
 
 EM.epoll
 EventMachine::run {
@@ -28,7 +28,7 @@ EventMachine::run {
 	print "S/F/C: #{WordFuzzServer.result_tracker.summary[:success]} / "
 	print "#{WordFuzzServer.result_tracker.summary[:fail]} / "
 	print "#{WordFuzzServer.result_tracker.summary[:crash]}), "
-        print "Speed: #{"%.2f" % ((@total-@old_total)/(Time.now-@old_time).to_f)}           "
+        print "Speed: #{"%.2f" % ((@total-@old_total)/(Time.now-@old_time).to_f)}   "
         @old_total=Integer(WordFuzzServer.result_tracker.summary[:current_count])
         @old_time=Time.now
     end
