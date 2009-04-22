@@ -29,7 +29,7 @@ class FuzzServer < EventMachine::Connection
             :agent_name=>"SERVER",
             :server_ip=>"0.0.0.0",
             :server_port=>10001,
-            :work_dir=>File.expand_path('~/fuzzserver/data'),
+            :work_dir=>File.expand_path('~/fuzzserver'),
             :database_filename=>"/dev/shm/metafuzz.db"
         }
         @config=default_config.merge config_hsh
@@ -42,7 +42,7 @@ class FuzzServer < EventMachine::Connection
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
-                    Dir.mkdir(config[:work_dir])
+                    Dir.mkdir(@config[:work_dir])
                 rescue
                     raise RuntimeError, "ProdctionClient: Couldn't create directory: #{$!}"
                 end
