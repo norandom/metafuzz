@@ -9,7 +9,7 @@ class Producer < Generators::NewGen
     START_AT=0
     SEEN_LIMIT=5000
 
-    Template=File.open( File.expand_path("~/wordcrashes/boof.doc"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
@@ -41,7 +41,7 @@ class Producer < Generators::NewGen
                 new_values=cartprod.next
                 fields.zip(new_values) {|field,new_value| field.set_raw(new_value.unpack('B*').join[-field.length..-1])}
                 #fields.each {|f| puts atom.inspect[atom.flatten.index(f)]}
-                print '.';$stdout.flush
+                #print '.';$stdout.flush
                 yield 
             end
             fields.zip(saved_values) {|field,saved_value| field.set_value saved_value}

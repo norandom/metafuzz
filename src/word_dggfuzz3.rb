@@ -9,7 +9,7 @@ class Producer < Generators::NewGen
     START_AT=0
     SEEN_LIMIT=5000
 
-    Template=File.open( File.expand_path("~/wordcrashes/boof.doc"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
