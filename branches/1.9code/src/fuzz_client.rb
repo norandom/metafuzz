@@ -4,17 +4,19 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
+require 'base64'
 
 
 class FuzzClient < EventMachine::Connection
 
+    VERSION="1.0.7"
     def self.setup( config_hsh={})
         default_config={
             :agent_name=>"CLIENT1",
             :server_ip=>"127.0.0.1",
             :server_port=>10001,
-            :work_dir=>File.expand_path('~/fuzzclient'),
-            :poll_interval=>5
+            :work_dir=>File.expand_path('C:/fuzzclient'),
+            :poll_interval=>60
         }
         @config=default_config.merge config_hsh
         @config.each {|k,v|
@@ -33,12 +35,16 @@ class FuzzClient < EventMachine::Connection
             else
                 raise RuntimeError, "FuzzClient: Work directory unavailable. Exiting."
             end
-        end
+          end
+          @unanswered=[]
+          class << self
+            attr_reader :unanswered
+          end
     end
 
     def post_init
         @handler=NetStringTokenizer.new
-        puts "FuzzClient: Starting up..."
+        puts "FuzzClient#{VERSION}: Starting up..."
         send_client_startup
     end
 
@@ -64,30 +70,32 @@ class FuzzClient < EventMachine::Connection
     end
 
     def send_client_startup
-        @waiting_for_server=EventMachine::DefaultDeferrable.new
-        @waiting_for_server.timeout(self.class.poll_interval)
-        @waiting_for_server.errback do
-            puts "Fuzzclient: Connection timed out. Retrying."
-            send_client_startup
-        end
         send_message(
             :verb=>:client_startup,
             :station_id=>self.class.agent_name,
             :client_type=>:fuzz,
             :data=>"")
+        waiter=EventMachine::DefaultDeferrable.new
+        waiter.timeout(self.class.poll_interval)
+        waiter.errback do
+            puts "Fuzzclient: Initial connection timed out. Retrying."
+            send_client_startup
+          end
+        self.class.unanswered << waiter
     end
 
     def send_client_ready
-        @waiting_for_server=EventMachine::DefaultDeferrable.new
-        @waiting_for_server.timeout(self.class.poll_interval)
-        @waiting_for_server.errback do
-            puts "Fuzzclient: Connection timed out. Retrying."
-            send_client_startup
-        end
         send_message(
             :verb=>:client_ready,
             :station_id=>self.class.agent_name,
             :data=>"")
+        waiter=EventMachine::DefaultDeferrable.new
+        waiter.timeout(self.class.poll_interval)
+        waiter.errback do
+            puts "Fuzzclient: Connection timed out. Retrying."
+            send_client_ready
+          end
+        self.class.unanswered << waiter
     end
 
     def send_result(id, status, crash_details, fuzzfile)
@@ -103,11 +111,8 @@ class FuzzClient < EventMachine::Connection
     # Protocol Receive functions
 
     def handle_deliver( msg )
-        if @waiting_for_server
-            @waiting_for_server.succeed
-            @waiting_for_server=false
-        end
-        fuzzdata=msg.data
+        self.class.unanswered.shift.succeed until self.class.unanswered.empty?
+        fuzzdata=Base64.decode64 msg.data
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
         rescue
@@ -120,15 +125,13 @@ class FuzzClient < EventMachine::Connection
     end
 
     def handle_server_ready( msg )
-        if @waiting_for_server
-            @waiting_for_server.succeed
-            @waiting_for_server=false
-        end
+        self.class.unanswered.shift.succeed until self.class.unanswered.empty?
         send_client_ready
     end
 
     def handle_server_bye( msg )
         puts "FuzzClient: Server is finished."
+        send_client_bye
         EventMachine::stop_event_loop
     end
 
@@ -137,7 +140,7 @@ class FuzzClient < EventMachine::Connection
     end
 
     def receive_data(data)
-        @handler.parse(data).each {|m| 
+        @handler.parse(data).each {|m|
             msg=FuzzMessage.new(m)
             self.send("handle_"+msg.verb.to_s, msg)
         }

@@ -4,7 +4,7 @@ require 'fuzzer'
 class Producer < Generators::NewGen
 
     SEEN_LIMIT=5000
-    Template=File.open( File.expand_path("~/fuzzserver/template.rtf"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/template.rtf"),"r") {|io| io.read}
 
     def seen?( str )
         hsh=Digest::MD5.hexdigest(str)
@@ -21,8 +21,8 @@ class Producer < Generators::NewGen
                 struct=Fuzzer.string_to_binstruct(Template.clone,128,:little)
                 fuzzer=Fuzzer.new(struct)
                 fuzzer.basic_tests(10000,false,0,2) {|test|
-                    next if seen? test.to_s
-                    Fiber.yield test.to_s
+                    #next if seen? test.to_s
+                    Fiber.yield Template.clone.force_encoding("ASCII-8BIT")
                 }
                 print '.';$stdout.flush
             end
