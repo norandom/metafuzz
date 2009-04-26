@@ -4,6 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
+require 'base64'
 
 
 class FuzzClient < EventMachine::Connection
@@ -27,7 +28,7 @@ class FuzzClient < EventMachine::Connection
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
-                    Dir.mkdir(config['work_dir'])
+                    Dir.mkdir(@config['work_dir'])
                 rescue
                     raise RuntimeError, "FuzzClient: Couldn't create directory: #{$!}"
                 end
@@ -112,7 +113,7 @@ class FuzzClient < EventMachine::Connection
 
     def handle_deliver( msg )
         self.class.unanswered.shift.succeed until self.class.unanswered.empty?
-        fuzzdata=msg.data
+        fuzzdata=Base64::decode64(msg.data)
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
         rescue
