@@ -10,24 +10,24 @@ class ProductionClient < EventMachine::Connection
 
     def self.setup( config_hsh={})
         default_config={
-            :agent_name=>"PRODCLIENT1",
-            :server_ip=>"127.0.0.1",
-            :server_port=>10001,
-            :work_dir=>File.expand_path('~/prodclient'),
-            :poll_interval=>60,
-            :production_generator=>Producer.new
+            'agent_name'=>"PRODCLIENT1",
+            'server_ip'=>"127.0.0.1",
+            'server_port'=>10001,
+            'work_dir'=>File.expand_path('~/prodclient'),
+            'poll_interval'=>60,
+            'production_generator'=>Producer.new
         }
         @config=default_config.merge config_hsh
         @config.each {|k,v|
             meta_def k do v end
             meta_def k.to_s+'=' do |new| @config[k]=new end
         }
-        unless File.directory? @config[:work_dir]
-            print "Work directory #{@config[:work_dir]} doesn't exist. Create it? [y/n]: "
+        unless File.directory? @config['work_dir']
+            print "Work directory #{@config['work_dir']} doesn't exist. Create it? [y/n]: "
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
-                    Dir.mkdir(@config[:work_dir])
+                    Dir.mkdir(@config['work_dir'])
                 rescue
                     raise RuntimeError, "ProdctionClient: Couldn't create directory: #{$!}"
                 end
@@ -39,21 +39,21 @@ class ProductionClient < EventMachine::Connection
         @server_waits=[]
         @case_id=0
         class << self
-            attr_accessor :case_id, :idtracker, :server_waits
+            attr_accessor 'case_id', 'idtracker', 'server_waits'
         end
     end
 
     def send_message( msg_hash )
         self.reconnect(self.class.server_ip,self.class.server_port) if self.error?
-        send_data @handler.pack(FuzzMessage.new(msg_hash).to_yaml)
+        send_data @handler.pack(FuzzMessage.new(msg_hash).to_s)
     end
 
     def send_test_case( tc, case_id )
         send_message(
-            :verb=>:new_test_case,
-            :station_id=>self.class.agent_name,
-            :id=>case_id,
-            :data=>tc
+            'verb'=>'new_test_case',
+            'station_id'=>self.class.agent_name,
+            'id'=>case_id,
+            'data'=>tc
         )
         waiter=EventMachine::DefaultDeferrable.new
         waiter.timeout(self.class.poll_interval)
@@ -66,21 +66,21 @@ class ProductionClient < EventMachine::Connection
 
     def send_client_bye
         send_message(
-            :verb=>:client_bye,
-            :client_type=>:production,
-            :station_id=>self.class.agent_name,
-            :data=>""
+            'verb'=>'client_bye',
+            'client_type'=>'production',
+            'station_id'=>self.class.agent_name,
+            'data'=>""
         )
     end
 
     def send_client_startup
         puts "ProdClient: Trying to connect to #{self.class.server_ip} : #{self.class.server_port}" 
         send_message(
-            :verb=>:client_startup,
-            :client_type=>:production,
-            :template=>false,
-            :station_id=>self.class.agent_name,
-            :data=>""
+            'verb'=>'client_startup',
+            'client_type'=>'production',
+            'template'=>false,
+            'station_id'=>self.class.agent_name,
+            'data'=>""
         )
         waiter=EventMachine::DefaultDeferrable.new
         waiter.timeout(self.class.poll_interval)

@@ -9,7 +9,7 @@ class ResultTracker
     end
 
     def add_result(id, status, crashdetail_path=nil,crashfile_path=nil)
-        @db.insert_result(id,status,crashdetail_path,crashfile_path)
+        @db.insert_result(id,status.to_sym,crashdetail_path,crashfile_path)
     end
 
     def results_outstanding
