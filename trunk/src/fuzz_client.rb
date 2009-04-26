@@ -9,7 +9,7 @@ require 'base64'
 
 class FuzzClient < EventMachine::Connection
 
-    VERSION="1.0.7"
+    VERSION="1.1"
     def self.setup( config_hsh={})
         default_config={
             'agent_name'=>"CLIENT1",
