@@ -52,7 +52,7 @@ class FuzzMessage
 end
 
 =begin
-f=FuzzMessage.new({:verb=>"NEWDATA",:message=>"ELEPHANTS RULE"})
+f=FuzzMessage.new({'verb'=>"NEWDATA",'message'=>"ELEPHANTS RULE"})
 dumped=f.to_yaml
 p dumped.class
 tst=YAML::load(dumped)

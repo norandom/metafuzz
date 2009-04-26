@@ -41,7 +41,7 @@ class WordFuzzClient < FuzzClient
 
     def deliver(data,msg_id)
         begin
-            status=:error
+            status='error'
             crash_details="" # will only be set to anything if there's a crash
             this_test_filename=prepare_test_file(data, msg_id)
             begin
@@ -69,13 +69,13 @@ class WordFuzzClient < FuzzClient
             debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;!exploitable -m\\\" av;!load winext\\msec.dll;g\" -hd -x -xi ld -p #{current_pid}")
             begin
                 @word.deliver this_test_filename
-                status=:success
+                status='success'
                 print '.';$stdout.flush
             rescue
                 # check for crashes
                 sleep(0.1) # This magically seems to fix a race condition.
                 if debugger.crash?
-                    status=:crash
+                    status='crash'
                     sleep(0.1) while debugger.target_running?
                     crash_details=debugger.dq_all.join
                     #File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
@@ -84,7 +84,7 @@ class WordFuzzClient < FuzzClient
                     # the app won't be killed without -9.
                     debugger.close
                 else
-                    status=:fail
+                    status='fail'
                     print '#';$stdout.flush
                 end
             end
@@ -102,7 +102,7 @@ class WordFuzzClient < FuzzClient
     end
 end
 
-WordFuzzClient.setup(:server_ip=>"192.168.241.143", :work_dir=>"R:/fuzzclient")
+WordFuzzClient.setup('server_ip'=>"192.168.241.143", 'work_dir'=>"R:/fuzzclient")
 
 EventMachine::run {
     system("start ruby wordslayer.rb")
