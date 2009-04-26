@@ -102,7 +102,7 @@ class WordFuzzClient < FuzzClient
     end
 end
 
-WordFuzzClient.setup('server_ip'=>"192.168.241.143", 'work_dir'=>"R:/fuzzclient")
+WordFuzzClient.setup('server_ip'=>"192.168.241.143", 'work_dir'=>"B:/fuzzclient")
 
 EventMachine::run {
     system("start ruby wordslayer.rb")
