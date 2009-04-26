@@ -11,23 +11,23 @@ class FuzzClient < EventMachine::Connection
     VERSION="1.0.7"
     def self.setup( config_hsh={})
         default_config={
-            :agent_name=>"CLIENT1",
-            :server_ip=>"127.0.0.1",
-            :server_port=>10001,
-            :work_dir=>File.expand_path('C:/fuzzclient'),
-            :poll_interval=>60
+            'agent_name'=>"CLIENT1",
+            'server_ip'=>"127.0.0.1",
+            'server_port'=>10001,
+            'work_dir'=>File.expand_path('C:/fuzzclient'),
+            'poll_interval'=>60
         }
         @config=default_config.merge config_hsh
         @config.each {|k,v|
            meta_def k do v end
            meta_def k.to_s+'=' do |new| @config[k]=new end
         }
-        unless File.directory? @config[:work_dir]
-            print "Work directory #{@config[:work_dir]} doesn't exist. Create it? [y/n]: "
+        unless File.directory? @config['work_dir']
+            print "Work directory #{@config['work_dir']} doesn't exist. Create it? [y/n]: "
             answer=STDIN.gets.chomp
             if answer =~ /^[yY]/
                 begin
-                    Dir.mkdir(config[:work_dir])
+                    Dir.mkdir(config['work_dir'])
                 rescue
                     raise RuntimeError, "FuzzClient: Couldn't create directory: #{$!}"
                 end
@@ -37,7 +37,7 @@ class FuzzClient < EventMachine::Connection
           end
           @unanswered=[]
           class << self
-            attr_reader :unanswered
+            attr_reader 'unanswered'
           end
     end
 
@@ -50,8 +50,8 @@ class FuzzClient < EventMachine::Connection
     def deliver(data,msg_id)
         # Deliver the test here, return the status and any extended
         # crash data (eg debugger output). Currently, the harness
-        # uses :success, :fail, :crash and :error
-        [:success, ""]
+        # uses 'success', 'fail', 'crash' and 'error'
+        ['success', ""]
     end
 
     # Protocol Send functions
@@ -63,17 +63,17 @@ class FuzzClient < EventMachine::Connection
 
     def send_client_bye
         send_message(
-            :verb=>:client_bye,
-            :station_id=>self.class.agent_name,
-            :data=>"")
+            'verb'=>'client_bye',
+            'station_id'=>self.class.agent_name,
+            'data'=>"")
     end
 
     def send_client_startup
         send_message(
-            :verb=>:client_startup,
-            :station_id=>self.class.agent_name,
-            :client_type=>:fuzz,
-            :data=>"")
+            'verb'=>'client_startup',
+            'station_id'=>self.class.agent_name,
+            'client_type'=>'fuzz',
+            'data'=>"")
         waiter=EventMachine::DefaultDeferrable.new
         waiter.timeout(self.class.poll_interval)
         waiter.errback do
@@ -85,9 +85,9 @@ class FuzzClient < EventMachine::Connection
 
     def send_client_ready
         send_message(
-            :verb=>:client_ready,
-            :station_id=>self.class.agent_name,
-            :data=>"")
+            'verb'=>'client_ready',
+            'station_id'=>self.class.agent_name,
+            'data'=>"")
         waiter=EventMachine::DefaultDeferrable.new
         waiter.timeout(self.class.poll_interval)
         waiter.errback do
@@ -100,12 +100,12 @@ class FuzzClient < EventMachine::Connection
 
     def send_result(id, status, crash_details, fuzzfile)
         send_message(
-            :verb=>:result,
-            :station_id=>self.class.agent_name,
-            :id=>id,
-            :status=>status,
-            :data=>crash_details,
-            :crashfile=>(status==:crash ? fuzzfile : false))
+            'verb'=>'result',
+            'station_id'=>self.class.agent_name,
+            'id'=>id,
+            'status'=>status,
+            'data'=>crash_details,
+            'crashfile'=>(status=='crash' ? fuzzfile : false))
     end
 
     # Protocol Receive functions
@@ -116,7 +116,7 @@ class FuzzClient < EventMachine::Connection
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
         rescue
-            status=:error
+            status='error'
             EventMachine::stop_event_loop
             raise RuntimeError, "Fuzzclient: Fatal error. Dying #{$!}"
         end
