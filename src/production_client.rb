@@ -4,6 +4,7 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
+require 'base64'
 
 class ProductionClient < EventMachine::Connection
 
@@ -101,7 +102,9 @@ class ProductionClient < EventMachine::Connection
         if self.class.production_generator.next?
             self.class.case_id+=1
             self.class.idtracker << self.class.case_id
-            send_test_case self.class.production_generator.next, self.class.case_id
+	    raw_test=self.class.production_generator.next
+	    encoded_test=Base64.encode64 raw_test
+            send_test_case encoded_test, self.class.case_id
         else
             send_client_bye
             puts "All done, exiting."
