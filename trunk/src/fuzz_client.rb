@@ -4,7 +4,6 @@ require 'em_netstring'
 require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
-require 'base64'
 
 
 class FuzzClient < EventMachine::Connection
@@ -59,7 +58,7 @@ class FuzzClient < EventMachine::Connection
 
     def send_message( msg_hash )
         self.reconnect(self.class.server_ip,self.class.server_port) if self.error?
-        send_data @handler.pack(FuzzMessage.new(msg_hash).to_yaml)
+        send_data @handler.pack(FuzzMessage.new(msg_hash))
     end
 
     def send_client_bye
@@ -94,6 +93,7 @@ class FuzzClient < EventMachine::Connection
         waiter.errback do
             puts "Fuzzclient: Connection timed out. Retrying."
             send_client_ready
+            #self.class.unanswered.delete self -- will this work??
           end
         self.class.unanswered << waiter
     end
@@ -112,7 +112,7 @@ class FuzzClient < EventMachine::Connection
 
     def handle_deliver( msg )
         self.class.unanswered.shift.succeed until self.class.unanswered.empty?
-        fuzzdata=Base64.decode64 msg.data
+        fuzzdata=msg.data
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
         rescue
