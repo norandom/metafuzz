@@ -4,7 +4,7 @@ class WordFuzzServer < FuzzServer
     # handle the result, write out the doc file and the .txt details.
     def handle_result( msg )
         result_id,result_status,crashdata,crashfile=msg.id, msg.status, msg.data, msg.crashfile
-        if result_status==:crash
+        if result_status=='crash'
             detail_path=File.join(self.class.work_dir,"detail-#{result_id}.txt")
             crashfile_path=File.join(self.class.work_dir,"crash-#{result_id}.doc")
             File.open(detail_path, "wb+") {|io| io.write(crashdata)}
@@ -22,8 +22,8 @@ EventMachine::run {
         @old_time||=Time.now
         @old_total||=Integer(WordFuzzServer.result_tracker.summary[:current_count])
         @total=Integer(WordFuzzServer.result_tracker.summary[:current_count])
-        print "\rconns: #{EventMachine.connection_count}, "
-        print "Q: #{WordFuzzServer.waiting_for_data.size}, "
+        #print "\rconns: #{EventMachine.connection_count}, "
+        print "\rQ: #{WordFuzzServer.waiting_for_data.size}, "
         print "Done: #{@total} ("
 	print "S/F/C: #{WordFuzzServer.result_tracker.summary[:success]} / "
 	print "#{WordFuzzServer.result_tracker.summary[:fail]} / "

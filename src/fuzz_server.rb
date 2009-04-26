@@ -26,23 +26,23 @@ class FuzzServer < EventMachine::Connection
 	end
 	def self.setup( config_hsh={})
 		default_config={
-			:agent_name=>"SERVER",
-			:server_ip=>"0.0.0.0",
-			:server_port=>10001,
-			:work_dir=>File.expand_path('~/fuzzserver'),
-			:database_filename=>"/dev/shm/metafuzz.db"
+			'agent_name'=>"SERVER",
+			'server_ip'=>"0.0.0.0",
+			'server_port'=>10001,
+			'work_dir'=>File.expand_path('~/fuzzserver'),
+			'database_filename'=>"/dev/shm/metafuzz.db"
 		}
 		@config=default_config.merge config_hsh
 		@config.each {|k,v|
 			meta_def k do v end
 			meta_def k.to_s+'=' do |new| @config[k]=new end
 		}
-		unless File.directory? @config[:work_dir]
-			print "Work directory #{@config[:work_dir]} doesn't exist. Create it? [y/n]: "
+		unless File.directory? @config['work_dir']
+			print "Work directory #{@config['work_dir']} doesn't exist. Create it? [y/n]: "
 			answer=STDIN.gets.chomp
 			if answer =~ /^[yY]/
 				begin
-					Dir.mkdir(@config[:work_dir])
+					Dir.mkdir(@config['work_dir'])
 				rescue
 					raise RuntimeError, "ProdctionClient: Couldn't create directory: #{$!}"
 				end
@@ -63,13 +63,13 @@ class FuzzServer < EventMachine::Connection
 	end
 
 	def send_msg( msg_hash )
-		send_data @handler.pack(FuzzMessage.new(msg_hash).to_yaml)
+		send_data @handler.pack(FuzzMessage.new(msg_hash).to_s)
 	end
 
 	# Users might want to overload this function.
 	def handle_result( msg )
 		result_id,result_status,crashdata,crashfile=msg.id, msg.status, msg.data, msg.crashfile
-		if result_status==:crash
+		if result_status=='crash'
 			detail_path=File.join(self.class.work_dir,"detail-#{result_id}.txt")
 			crashfile_path=File.join(self.class.work_dir,"crash-#{result_id}")
 			File.open(detail_path, "wb+") {|io| io.write(crashdata)}
@@ -82,12 +82,12 @@ class FuzzServer < EventMachine::Connection
 	def handle_client_ready( msg )
 		unless self.class.delivery_queue.empty?
 			id,test_case=self.class.delivery_queue.shift
-			send_msg(:verb=>:deliver,:data=>test_case.data,:id=>id)
+			send_msg('verb'=>'deliver','data'=>test_case.data,'id'=>id)
 			test_case.get_new_case
 		else
 			waiter=EventMachine::DefaultDeferrable.new
 			waiter.callback do |id, test_case|
-				send_msg(:verb=>:deliver,:data=>test_case.data,:id=>id)
+				send_msg('verb'=>'deliver','data'=>test_case.data,'id'=>id)
 				test_case.get_new_case
 			end
 			self.class.waiting_for_data << waiter
@@ -95,7 +95,7 @@ class FuzzServer < EventMachine::Connection
 	end
 
 	def handle_client_startup( msg )
-		send_msg(:verb=>:server_ready)
+		send_msg('verb'=>'server_ready')
 	end
 
 	def handle_new_test_case( msg )
@@ -103,8 +103,8 @@ class FuzzServer < EventMachine::Connection
 			server_id=self.class.result_tracker.check_out
 			test_case=TestCase.new(msg.data)
 			test_case.callback do
-				send_msg(:verb=>:ack_case, :id=>msg.id)
-				send_msg(:verb=>:server_ready,:server_id=>server_id)
+				send_msg('verb'=>'ack_case', 'id'=>msg.id)
+				send_msg('verb'=>'server_ready','server_id'=>server_id)
 			end
 			if waiting=self.class.waiting_for_data.shift
 				waiting.succeed(server_id,test_case)
