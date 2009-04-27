@@ -5,6 +5,7 @@ require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
 require 'base64'
+require 'zlib'
 
 class ProductionClient < EventMachine::Connection
 
@@ -48,11 +49,12 @@ class ProductionClient < EventMachine::Connection
         send_data @handler.pack(FuzzMessage.new(msg_hash).to_s)
     end
 
-    def send_test_case( tc, case_id )
+    def send_test_case( tc, case_id, crc )
         send_message(
             'verb'=>'new_test_case',
             'station_id'=>self.class.agent_name,
             'id'=>case_id,
+            'crc32'=>crc,
             'data'=>tc
         )
         waiter=EventMachine::DefaultDeferrable.new
@@ -103,8 +105,9 @@ class ProductionClient < EventMachine::Connection
             self.class.case_id+=1
             self.class.idtracker << self.class.case_id
 	    raw_test=self.class.production_generator.next
+            crc=Zlib.crc32(raw_test)
 	    encoded_test=Base64.encode64 raw_test
-            send_test_case encoded_test, self.class.case_id
+            send_test_case encoded_test, self.class.case_id, crc
         else
             send_client_bye
             puts "All done, exiting."
