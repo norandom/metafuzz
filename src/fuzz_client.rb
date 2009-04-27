@@ -5,11 +5,12 @@ require 'fuzzprotocol'
 require 'fileutils'
 require 'objhax'
 require 'base64'
+require 'zlib'
 
 
 class FuzzClient < EventMachine::Connection
 
-    VERSION="1.1"
+    VERSION="1.1.1"
     def self.setup( config_hsh={})
         default_config={
             'agent_name'=>"CLIENT1",
@@ -114,6 +115,9 @@ class FuzzClient < EventMachine::Connection
     def handle_deliver( msg )
         self.class.unanswered.shift.succeed until self.class.unanswered.empty?
         fuzzdata=Base64::decode64(msg.data)
+        unless Zlib.crc32(fuzzdata)==msg.crc32
+          raise RuntimeError, "Fuzzclient: data corruption, mismatched CRC32."
+        end
         begin
             status,crash_details=deliver(fuzzdata,msg.id)
         rescue
