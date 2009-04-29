@@ -21,8 +21,8 @@ class Producer < Generators::NewGen
                 struct=Fuzzer.string_to_binstruct(Template.clone,128,:little)
                 fuzzer=Fuzzer.new(struct)
                 fuzzer.basic_tests(10000,false,0,2) {|test|
-                    #next if seen? test.to_s
-                    Fiber.yield Template.clone.force_encoding("ASCII-8BIT")
+                    next if seen? test.to_s
+                    Fiber.yield test.to_s
                 }
                 print '.';$stdout.flush
             end
