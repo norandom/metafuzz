@@ -10,7 +10,6 @@ class Producer < Generators::NewGen
         @block=Fiber.new do
             loop do
             Fiber.yield Template
-            print '.';$stdout.flush
             end
             false
         end

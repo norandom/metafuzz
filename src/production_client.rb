@@ -61,7 +61,7 @@ class ProductionClient < EventMachine::Connection
         waiter.timeout(self.class.poll_interval)
         waiter.errback do
             puts "ProdClient: Connection timed out. Retrying ID #{case_id.to_s}"
-            send_test_case( tc, case_id )
+            send_test_case( tc, case_id, crc )
         end
         self.class.server_waits << waiter
     end
