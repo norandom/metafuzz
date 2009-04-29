@@ -4,7 +4,7 @@ require 'fuzzer'
 class Producer < Generators::NewGen
 
     SEEN_LIMIT=5000
-    Template=File.open( File.expand_path("~/fuzzserver/template.rtf"),"r") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/template.rtf"),"rb") {|io| io.read}
 
     def seen?( str )
         hsh=Digest::MD5.hexdigest(str)
@@ -24,7 +24,6 @@ class Producer < Generators::NewGen
                     next if seen? test.to_s
                     Fiber.yield test.to_s
                 }
-                print '.';$stdout.flush
             end
             false
         end
