@@ -20,6 +20,7 @@ class Producer < Generators::NewGen
             loop do
                 struct=Fuzzer.string_to_binstruct(Template.clone,128,:little)
                 fuzzer=Fuzzer.new(struct)
+		fuzzer.verbose=false
                 fuzzer.basic_tests(10000,false,0,2) {|test|
                     next if seen? test.to_s
                     Fiber.yield test.to_s
