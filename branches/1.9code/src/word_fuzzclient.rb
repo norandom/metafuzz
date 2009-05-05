@@ -13,6 +13,14 @@ rescue
     nil
 end
 
+# Temporary sets of commands and stuff go here. Lame, but working.
+Win32::Registry::HKEY_CURRENT_USER.open('Control Panel\Desktop',Win32::Registry::KEY_WRITE)["Wallpaper"]=""
+Win32::Registry::HKEY_CURRENT_USER.open('Control Panel\Desktop',Win32::Registry::KEY_WRITE)["SCRNSAVE.EXE"]=""
+Win32::Registry::HKEY_CURRENT_USER.open('Environment',Win32::Registry::KEY_WRITE)["TEMP"]="R:\\Temp"
+Win32::Registry::HKEY_CURRENT_USER.open('Environment',Win32::Registry::KEY_WRITE)["TMP"]="R:\\Temp"
+Win32::Registry::HKEY_LOCAL_MACHINE.open('SYSTEM\CurrentControlSet\Control\Session Manager\Environment',Win32::Registry::KEY_WRITE)["TEMP"]="R:\\Temp"
+Win32::Registry::HKEY_LOCAL_MACHINE.open('SYSTEM\CurrentControlSet\Control\Session Manager\Environment',Win32::Registry::KEY_WRITE)["TMP"]="R:\\Temp"
+
 class WordFuzzClient < FuzzClient
 
     def prepare_test_file(data, msg_id)
@@ -66,7 +74,10 @@ class WordFuzzClient < FuzzClient
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
             # -x ignore first chance av exceptions
             # -xi ld ignore module loads
-            debugger=Connector.new(CONN_CDB,"-snul -c \"sxe -c \\\"r;!exploitable -m\\\" av;!load winext\\msec.dll;g\" -hd -x -xi ld -p #{current_pid}")
+            debugger=Connector.new(CONN_CDB,"-snul -xi ld -p #{current_pid}")
+			debugger.puts "!load winext\\msec.dll"
+			debugger.puts "sxe -c \"!exploitable -m;g\" av"
+			debugger.puts "g"
             begin
                 @word.deliver this_test_filename
                 status=:success
@@ -78,7 +89,6 @@ class WordFuzzClient < FuzzClient
                     status=:crash
                     sleep(0.1) while debugger.target_running?
                     crash_details=debugger.dq_all.join
-                    #File.open(File.join(@config["WORK DIR"],"crash-"+msg_id.to_s+".doc"), "wb+") {|io| io.write(data)}
                     print '!';$stdout.flush
                     # If the app has crashed we should kill the debugger, otherwise
                     # the app won't be killed without -9.
@@ -102,7 +112,16 @@ class WordFuzzClient < FuzzClient
     end
 end
 
-WordFuzzClient.setup(:server_ip=>"192.168.241.141", :work_dir=>"B:/fuzzclient")
+server="192.168.242." << (101+rand(2)).to_s
+if File.directory? 'R:/'
+	workdir='R:/fuzzclient'
+elsif File.directory? "E:/"
+	workdir="E:/fuzzclient"
+else
+	raise RuntimeError, "WordFuzzClient: Couldn't find the ramdisk."
+end
+WordFuzzClient.setup('server_ip'=>server, 'work_dir'=>workdir)
+puts "Modified CDB command line"
 
 EventMachine::run {
     system("start ruby wordslayer.rb")
