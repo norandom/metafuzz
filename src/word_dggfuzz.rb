@@ -7,7 +7,7 @@ class Producer < Generators::NewGen
 
     START_AT=0
 
-    Template=File.open( File.expand_path("~/wordcrashes/boof.doc"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/boof.doc"),"rb") {|io| io.read}
 
     def hexdump(str)
         ret=""
@@ -75,21 +75,16 @@ class Producer < Generators::NewGen
     def initialize
         @block=Fiber.new do
             begin
-                unmodified_file=Template
-                header,raw_fib,rest=""
-                temp_file=Tempfile.new('wordfuzz')
-                File.open(temp_file.path,"wb+") {|io| io.write Template}
-                File.open(temp_file.path, "rb") {|io| 
-                    header=io.read(512)
-                    raw_fib=io.read(1472)
-                    rest=io.read
-                }
-                raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == unmodified_file
+                unmodified_file=StringIO.new(Template.clone)
+		    header=unmodified_file.read(512)
+		    raw_fib=unmodified_file.read(1472)
+		    rest=unmodified_file.read
+                raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == Template
                 fib=WordStructures::WordFIB.new(raw_fib.clone)
                 raise RuntimeError, "Data Corruption - fib.to_s not raw_fib" unless fib.to_s == raw_fib
                 # Open the file, get a copy of the table stream
-                ole=Ole::Storage.open(temp_file.path,'rb')
-                #ole=Ole::Storage.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb")
+                unmodified_file.rewind
+                ole=Ole::Storage.open(unmodified_file)
                 # get the correct table stream 1Table or 0Table
                 table_stream=ole.file.read(fib.fWhichTblStm.to_s+"Table")
                 ole.close
@@ -115,7 +110,7 @@ class Producer < Generators::NewGen
                     raise RuntimeError, "DggFuzz: #{$!}"
                 end
                 raise RuntimeError, "Data Corruption - Binstruct.to_s not fuzztarget" unless dgg_parsed.map {|s| s.to_s}.join == fuzztarget
-                dgg_parsed[2..2].each {|bs|
+                dgg_parsed.each {|bs|
                     typefixer=proc {|bs| bs.flatten.each {|f|
                         if f.name==:recType
                             f.set_value(f.get_value | 0xf000)
@@ -125,6 +120,7 @@ class Producer < Generators::NewGen
                     }
                     f=Fuzzer.new(bs,typefixer)
                     f.preserve_length=true
+			f.verbose=false
                     #p f.count_tests(1024,false)
                     f.basic_tests(1024,false, START_AT) {|fuzz|
                         #head+fuzzed+rest
@@ -133,7 +129,8 @@ class Producer < Generators::NewGen
                         fuzzed_table=ts_head+ts_gunk+ts_rest
                         raise RuntimeError, "Dggfuzz: fuzzed table stream same as old one!" if fuzzed_table==table_stream
                         #write the modified stream into the temp file
-                        Ole::Storage.open(temp_file.path,'rb+') {|ole|
+                        unmodified_file.rewind
+                        Ole::Storage.open(unmodified_file) {|ole|
                             # get the correct table stream 1Table or 0Table
                             ts=ole.dirents.map{|d| d.name}.select {|s| s=~/table/i}[0][0]
                             ole.file.open(ts+"Table","wb+") {|f| f.write( fuzzed_table )}
@@ -142,11 +139,9 @@ class Producer < Generators::NewGen
                             raise RuntimeError, "Dggfuzz: Fuzzer is set to preserve length, but delta !=0?"
                             # Read in the new file contents with the modified table stream
                             # so we can fix up the FIB pointers and lengths and such
-                            File.open( temp_file.path,"rb") {|io| 
-                                header=io.read(512)
-                                raw_fib=io.read(1472)
-                                rest=io.read
-                            }
+			    header=unmodified_file.read(512)
+			    raw_fib=unmodified_file.read(1472)
+			    rest=unmodified_file.read
                             newfib=WordStructures::WordFIB.new(raw_fib)
                             #adjust the lcb for this structure
                             newfib.send((lcb.to_s+'=').to_sym, ts_gunk.length)
@@ -156,10 +151,11 @@ class Producer < Generators::NewGen
                                     newfib.send((off.to_s+'=').to_sym, fib.send(off)+length_delta)
                                 end
                             }
-                            File.open(temp_file.path,"wb+") {|io| io.write header+newfib.to_s+rest}
+                            File.open(unmodified_file,"wb+") {|io| io.write header+newfib.to_s+rest}
                         end
                         #add to the queue
-                        Fiber.yield( File.open(temp_file.path,"rb") {|io| io.read} )
+                        unmodified_file.rewind
+                        Fiber.yield( unmodified_file.read )
                     }
                 }
             rescue
