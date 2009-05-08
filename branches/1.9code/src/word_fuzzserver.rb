@@ -1,4 +1,5 @@
 require 'fuzz_server'
+require 'base64'
 
 class WordFuzzServer < FuzzServer
     # handle the result, write out the doc file and the .txt details.
@@ -8,7 +9,7 @@ class WordFuzzServer < FuzzServer
             detail_path=File.join(self.class.work_dir,"detail-#{result_id}.txt")
             crashfile_path=File.join(self.class.work_dir,"crash-#{result_id}.doc")
             File.open(detail_path, "wb+") {|io| io.write(crashdata)}
-            File.open(crashfile_path, "wb+") {|io| io.write(crashfile)}
+            File.open(crashfile_path, "wb+") {|io| io.write(Base64::decode64(crashfile))}
         end
         self.class.result_tracker.add_result(Integer(result_id),result_status,detail_path||=nil,crashfile_path||=nil)
     end
