@@ -141,10 +141,10 @@ class BinStruct
     end
 
     def self.endianness( endianness )
-        unless endianness.downcase=="network" or endianness.downcase=="intel"
+        unless endianness==:big or endianness==:little
             raise ArgumentError, "Binstruct: Unknown endianness #{endianness}, use 'intel' or 'network' (default)."
         end
-        @initial_endianness=String(endianness)
+        @initial_endianness=endianness
     end
 
     def self.method_missing( meth, *args ) #:nodoc:
