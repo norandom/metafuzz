@@ -39,8 +39,8 @@ module Fields
       @default_value=default # can still be nil
       @bitstring=self.parse_buffer(bitstring)
       @type=self.class.to_s[/\w+(?=Field)/].downcase #fricking ugly
-      unless endian.downcase == "network" or endian == "intel"
-	raise ArgumentError, "#{self.class.to_s[/\w+$/]} (#{@name}): Unknown Endian type - use 'network' or 'intel'"
+      unless endian==:big or endian==:little
+	raise ArgumentError, "#{self.class.to_s[/\w+$/]} (#{@name}): Unknown Endian type - use :big or :little"
       end
       @endianness=endian
     end
@@ -140,7 +140,7 @@ module Fields
       # (get_value will return the positive interpretation)
       unpadded=value < 0 ? (("1"+"0"*@length).to_i(2)-value.abs).to_s(2) : value.to_s(2)
       value="0"*(@length-unpadded.length)+unpadded # left pad with zeroes to full length
-      	if self.endianness=="intel"
+      	if self.endianness==:little
 		if value.length > 8 && value.length % 8 ==0
 			value=value.scan(/.{8}/).reverse.join
 		end
@@ -150,7 +150,7 @@ module Fields
 
     def get_value
 	tempstring=@bitstring
-	if self.endianness=="intel"
+	if self.endianness==:little
 		if tempstring.length > 8 && tempstring.length % 8 ==0
 			tempstring=tempstring.scan(/.{8}/).reverse.join
 		end
@@ -244,7 +244,7 @@ module Fields
       end
       unpadded=value <= 0 ? (("1"+"0"*@length).to_i(2)-value.abs).to_s(2) : value.to_s(2)
       value="0"*(@length-unpadded.length)+unpadded # left pad with zeroes to full length
-	if self.endianness=="intel"
+	if self.endianness==:little
 		if value.length > 8 && value.length % 8 ==0
 			value=value.scan(/.{8}/).reverse.join
 		end
@@ -254,7 +254,7 @@ module Fields
 
     def get_value
       	tempstring=@bitstring
-	if self.endianness=="intel"
+	if self.endianness==:little
 		if tempstring.length > 8 && tempstring.length % 8 ==0
 			tempstring=tempstring.scan(/.{8}/).reverse.join
 		end

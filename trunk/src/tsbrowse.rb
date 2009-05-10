@@ -1,7 +1,6 @@
 Shoes.setup do
     gem 'ruby-ole'
 end
-require 'fib'
 require 'binstruct'
 require 'wordstruct'
 require 'ole/storage'
