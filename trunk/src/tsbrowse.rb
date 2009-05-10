@@ -34,15 +34,18 @@ Shoes.app do
                     @bar.replace(" >> StructuredStorage")
                     raw_fib=raw[512,1472]
                     fib=WordStructures::WordFIB.new(raw_fib)
-                    ole=Ole::Storage.open(f ,'rb')
-                    ole.dir.entries('.')[2..-1].each {|dirname|
-                        dircontents=ole.file.read(dirname) rescue ""
+                    Ole::Storage.open(f ,'rb') {|ole|
+                    ole.dirents.each {|dirent|
+                        next if dirent.dir?
+                        contents=dirent.read
+                        dirname=dirent.name
                         @link_window.append do
                             para link(dirname, :stroke=>chartreuse) {|x| 
-                                @structure.replace( code hexdump(dircontents))
+                                @structure.replace( code hexdump(contents))
                                 @baz.replace(" >> "+ dirname)
                              } 
                         end
+                    }
                     }
                 end
                 @foo=para "", :stroke=>chartreuse, :margin_left=>30
