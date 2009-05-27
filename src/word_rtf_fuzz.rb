@@ -21,6 +21,8 @@ class Producer < Generators::NewGen
                 struct=Fuzzer.string_to_binstruct(Template.clone,128,:little)
                 fuzzer=Fuzzer.new(struct)
 		fuzzer.verbose=false
+		puts fuzzer.count_tests(10000,false,0,2)
+		exit
                 fuzzer.basic_tests(10000,false,0,2) {|test|
                     next if seen? test.to_s
                     Fiber.yield test.to_s
@@ -31,3 +33,4 @@ class Producer < Generators::NewGen
         super
     end
 end
+
