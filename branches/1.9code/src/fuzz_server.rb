@@ -1,8 +1,8 @@
 require 'rubygems'
 require 'eventmachine'
-require 'em_netstring'
-require 'fuzzprotocol'
-require 'result_tracker'
+require File.dirname(__FILE__) + '/em_netstring'
+require File.dirname(__FILE__) + '/fuzzprotocol'
+require File.dirname(__FILE__) + '/result_tracker'
 require 'objhax'
 
 class TestCase < EventMachine::DefaultDeferrable

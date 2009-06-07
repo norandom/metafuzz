@@ -1,6 +1,5 @@
-require 'windows_popen'
-require 'win32ole'
-CDB_PATH="\"C:\\Program Files\\Debugging Tools for Windows (x86)\\cdb.exe\" "
+require File.dirname(__FILE__) + '/windows_popen'
+require 'win32api'
 require 'objhax'
 require 'win32/process'
 
@@ -11,6 +10,8 @@ require 'win32/process'
 #Sugar may follow later. Remember that program names that include spaces need to be 
 #enclosed in quotes \"c:\\Program Files [...] \" etc.
 module CONN_CDB
+
+CDB_PATH="\"C:\\Program Files\\Debugging Tools for Windows (x86)\\cdb.exe\" "
 
     #These methods will override the stubs present in the Connector
     #class, and implement the protocol specific functionality for 
