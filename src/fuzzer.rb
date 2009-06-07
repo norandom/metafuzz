@@ -1,6 +1,6 @@
 require 'binstruct'
-require 'generators'
-require 'mutations'
+require File.dirname(__FILE__) + '/generators.rb'
+require File.dirname(__FILE__) + '/mutations.rb'
 
 #The Fuzzer class is a simple metafuzzing example. It will attempt to send sensible fuzzing
 #output based on the types of fields within the structure. Fuzzer allows the user to specify 'fixup'
@@ -92,7 +92,7 @@ class Fuzzer
 
         count=0
         if skip > 0
-            puts "Skipping #{skip} tests."
+            puts "Skipping #{skip} tests." if @verbose
         end
         fuzzblock=proc do |current_field| # remember that it's possible for current_field to be not a Fields::Field
 
@@ -141,7 +141,6 @@ class Fuzzer
             end
             current_field.set_value(val)
             raise RuntimeError, "Fuzzer: Data Corruption" unless @binstruct.to_s==@check
-            #puts "Check passed."
 
             puts "starting delete" if @verbose
             nulfield=Binstruct.new 
@@ -236,11 +235,15 @@ class Fuzzer
             end
             puts "inject done" if @verbose
         end # fuzzblock
+        # Run the fuzzblock, defined above, on each field in the structure, 
+        # flattening out nested substructs.
         if @binstruct.respond_to? :deep_each
-            @binstruct.flatten.reverse.each &fuzzblock
+            @binstruct.flatten.each &fuzzblock
         else
             @binstruct.fields.each &fuzzblock
         end
+        # Test all combinations of fields that have been linked with the group constructor
+        # during structure definition. Also recurse into substructs.
         if @grouplink
             cartprod_block=proc do |bs|
                 bs.groups.each {|group, contents|

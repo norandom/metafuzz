@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'fuzzer'
+require 'generators'
 require 'digest/md5'
 
 class Producer < Generators::NewGen
@@ -63,6 +64,7 @@ class Producer < Generators::NewGen
                 end
                 while fuzzgen.next?
                     substring_array[i]=fuzzgen.next
+                    puts substring_array[i]
                     fuzzed_string=substring_array.join
                     next if seen? fuzzed_string
                     Fiber.yield fuzzed_string

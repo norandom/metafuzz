@@ -1,4 +1,4 @@
-require 'rtdbwrapper'
+require File.dirname(__FILE__) + '/rtdbwrapper'
 
 class ResultTracker
 
