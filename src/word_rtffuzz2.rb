@@ -44,9 +44,9 @@ class Producer < Generators::NewGen
     def hexstring_generator( str )
         packed=[str].pack('H*')
         g1=Generators::RollingCorrupt.new(packed,16,16,32,:little)
-        g2=Generators::RollingCorrupt.new(packed,13,3,16)
-        g3=Generators::RollingCorrupt.new(packed,8,8,0)
-        g4=Generators::RollingCorrupt.new(packed,32,32,16,:little)
+        g2=Generators::RollingCorrupt.new(packed,15,5,16)
+        g3=Generators::RollingCorrupt.new(packed,8,8,50)
+        g4=Generators::RollingCorrupt.new(packed,32,32,32,:little)
         chained=Generators::Chain.new(g1,g2,g3,g4)
         unpacker=proc do |ary| ary.first.unpack('H*').first end
         final=Generators::Repeater.new(chained,1,1,1,unpacker)
@@ -61,15 +61,14 @@ class Producer < Generators::NewGen
             substring_array.each_index {|i|
                 next unless substring_array[i]=~/([0-9a-f]{2,})|([0-9]+)/
                 saved_value=substring_array[i].clone
-                if substring_array[i]=~/[0-9]+/
-                    #fuzzgen=base10_str_generator(substring_array[i])
+                if substring_array[i]=~/[0-9]{1,8}/
+                    fuzzgen=base10_str_generator(substring_array[i])
                 else
-                    #fuzzgen=hexstring_generator(substring_array[i])
-                end
                     fuzzgen=hexstring_generator(substring_array[i])
+                end
                 while fuzzgen.next?
                     substring_array[i]=fuzzgen.next
-		    puts substring_array[i-1..i+1].join('  ||  ')
+		    puts substring_array[i-1..i+1].join
                     fuzzed_string=substring_array.join
                     next if seen? fuzzed_string
                     Fiber.yield fuzzed_string
