@@ -1,3 +1,4 @@
+system "gem.bat install c:\\src\\json*"
 require 'fuzz_client'
 require 'connector'
 require 'conn_office'
@@ -20,6 +21,7 @@ Win32::Registry::HKEY_CURRENT_USER.open('Environment',Win32::Registry::KEY_WRITE
 Win32::Registry::HKEY_CURRENT_USER.open('Environment',Win32::Registry::KEY_WRITE)["TMP"]="R:\\Temp"
 Win32::Registry::HKEY_LOCAL_MACHINE.open('SYSTEM\CurrentControlSet\Control\Session Manager\Environment',Win32::Registry::KEY_WRITE)["TEMP"]="R:\\Temp"
 Win32::Registry::HKEY_LOCAL_MACHINE.open('SYSTEM\CurrentControlSet\Control\Session Manager\Environment',Win32::Registry::KEY_WRITE)["TMP"]="R:\\Temp"
+
 
 class WordFuzzClient < FuzzClient
 
@@ -49,7 +51,7 @@ class WordFuzzClient < FuzzClient
 
     def deliver(data,msg_id)
         begin
-            status=:error
+            status='error'
             crash_details="" # will only be set to anything if there's a crash
             this_test_filename=prepare_test_file(data, msg_id)
             begin
@@ -76,33 +78,29 @@ class WordFuzzClient < FuzzClient
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -xi ld -p #{current_pid}")
 			debugger.puts "!load winext\\msec.dll"
-			debugger.puts "sxe -c \"!exploitable -m;g\" av"
+			debugger.puts "sxe -c \"r;!exploitable -m;q\" av"
 			debugger.puts "g"
             begin
                 @word.deliver this_test_filename
-                status=:success
-                print '.';$stdout.flush
+                status='success'
+                print '.'
             rescue
                 # check for crashes
-                sleep(0.1) # This magically seems to fix a race condition.
+				sleep(0.1)
                 if debugger.crash?
-                    status=:crash
-                    sleep(0.1) while debugger.target_running?
+                    status='crash'
                     crash_details=debugger.dq_all.join
-                    print '!';$stdout.flush
-                    # If the app has crashed we should kill the debugger, otherwise
-                    # the app won't be killed without -9.
-                    debugger.close
+                    print '!'
                 else
-                    status=:fail
-                    print '#';$stdout.flush
+                    status='fail'
+                    print '#'
                 end
             end
             # close the debugger and kill the app
             # This should kill the winword process as well
             # Clean up the connection object
             @word.close rescue nil
-            debugger.close 
+			debugger.close rescue nil
             clean_up(this_test_filename) 
             [status,crash_details]
         rescue
@@ -112,7 +110,7 @@ class WordFuzzClient < FuzzClient
     end
 end
 
-server="192.168.242." << (101+rand(2)).to_s
+server="192.168.242.101"
 if File.directory? 'R:/'
 	workdir='R:/fuzzclient'
 elsif File.directory? "E:/"

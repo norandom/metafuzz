@@ -57,7 +57,7 @@ def send_test_case( tc, case_id, crc )
 	    'station_id'=>self.class.agent_name,
 	    'id'=>case_id,
 	    'crc32'=>crc,
-	    'encoding'=>self.class.production_generator.encoding rescue 'base64',
+	    'encoding'=>(self.class.production_generator.encoding rescue 'base64'),
 	    'data'=>tc
 	    )
 	    waiter=EventMachine::DefaultDeferrable.new
