@@ -6,7 +6,8 @@ require 'digest/md5'
 class Producer < Generators::NewGen
 
     SEEN_LIMIT=5000
-    Template=File.open( File.expand_path("~/fuzzserver/rtftest.rtf"),"rb") {|io| io.read}
+    Template=File.open( File.expand_path("~/fuzzserver/template.rtf"),"rb") {|io| io.read}
+    attr_reader :encoding
 
     def seen?( str )
         hsh=Digest::MD5.hexdigest(str)
@@ -42,15 +43,18 @@ class Producer < Generators::NewGen
 
     def hexstring_generator( str )
         packed=[str].pack('H*')
-        g1=Generators::RollingCorrupt.new(packed,16,16,16)
-        g2=Generators::RollingCorrupt.new(packed,13,7,16)
-        chained=Generators::Chain.new(g1,g2)
+        g1=Generators::RollingCorrupt.new(packed,16,16,32,:little)
+        g2=Generators::RollingCorrupt.new(packed,13,3,16)
+        g3=Generators::RollingCorrupt.new(packed,8,8,0)
+        g4=Generators::RollingCorrupt.new(packed,32,32,16,:little)
+        chained=Generators::Chain.new(g1,g2,g3,g4)
         unpacker=proc do |ary| ary.first.unpack('H*').first end
         final=Generators::Repeater.new(chained,1,1,1,unpacker)
     end
 
     def initialize
         @duplicate_check=Hash.new(false)
+	@encoding='base64'
         @block=Fiber.new do
             # substrings can be 2+ hex digits, 1+ digit or none of the above.
             substring_array=Template.split(/([0-9a-f]{2,})|([0-9]+)/)
@@ -58,13 +62,14 @@ class Producer < Generators::NewGen
                 next unless substring_array[i]=~/([0-9a-f]{2,})|([0-9]+)/
                 saved_value=substring_array[i].clone
                 if substring_array[i]=~/[0-9]+/
-                    fuzzgen=base10_str_generator(substring_array[i])
+                    #fuzzgen=base10_str_generator(substring_array[i])
                 else
-                    fuzzgen=hexstring_generator(substring_array[i])
+                    #fuzzgen=hexstring_generator(substring_array[i])
                 end
+                    fuzzgen=hexstring_generator(substring_array[i])
                 while fuzzgen.next?
                     substring_array[i]=fuzzgen.next
-                    puts substring_array[i]
+		    puts substring_array[i-1..i+1].join('  ||  ')
                     fuzzed_string=substring_array.join
                     next if seen? fuzzed_string
                     Fiber.yield fuzzed_string
