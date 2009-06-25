@@ -6,10 +6,11 @@ require File.dirname(__FILE__) + '/result_tracker'
 require 'objhax'
 
 class TestCase < EventMachine::DefaultDeferrable
-	attr_reader :data,:crc32
-	def initialize( data, crc )
+	attr_reader :data,:crc32,:encoding
+	def initialize( data, crc, encoding=nil )
 		@data=data
                 @crc32=crc
+		@encoding=encoding
 		super()
 	end
 	alias :get_new_case :succeed
@@ -83,12 +84,12 @@ class FuzzServer < EventMachine::Connection
 	def handle_client_ready( msg )
 		unless self.class.delivery_queue.empty?
 			id,test_case=self.class.delivery_queue.shift
-			send_msg('verb'=>'deliver','data'=>test_case.data,'id'=>id,'crc32'=>test_case.crc32)
+			send_msg('verb'=>'deliver','encoding'=>test_case.encoding,'data'=>test_case.data,'id'=>id,'crc32'=>test_case.crc32)
 			test_case.get_new_case
 		else
 			waiter=EventMachine::DefaultDeferrable.new
 			waiter.callback do |id, test_case|
-				send_msg('verb'=>'deliver','data'=>test_case.data,'id'=>id,'crc32'=>test_case.crc32)
+				send_msg('verb'=>'deliver','encoding'=>test_case.encoding,'data'=>test_case.data,'id'=>id,'crc32'=>test_case.crc32)
 				test_case.get_new_case
 			end
 			self.class.waiting_for_data << waiter
@@ -100,9 +101,9 @@ class FuzzServer < EventMachine::Connection
 	end
 
 	def handle_new_test_case( msg )
-		unless self.class.delivery_queue.any? {|id,tc| tc.data==msg.data }
+		unless self.class.delivery_queue.any? {|id,tc| tc.crc32==msg.crc32 }
 			server_id=self.class.result_tracker.check_out
-			test_case=TestCase.new(msg.data, msg.crc32)
+			test_case=TestCase.new(msg.data, msg.crc32, msg.encoding)
 			test_case.callback do
 				send_msg('verb'=>'ack_case', 'id'=>msg.id)
 				send_msg('verb'=>'server_ready','server_id'=>server_id)
