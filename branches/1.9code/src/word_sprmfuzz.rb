@@ -20,6 +20,14 @@ class Producer < Generators::NewGen
     }
     #Template=File.open( File.expand_path("~/wordcrashes/crash-192242.doc"),"rb") {|io| io.read}
 
+    def seen?( str )
+        hsh=Digest::MD5.hexdigest(str)
+        seen=@duplicate_check[hsh]
+        @duplicate_check[hsh]=true
+        @duplicate_check.shift if @duplicate_check.size > SEEN_LIMIT
+        seen
+    end
+
     def hexdump(str)
         ret=""
         str.unpack('H*').first.scan(/.{2}/).each_slice(16) {|s| 
@@ -45,6 +53,7 @@ class Producer < Generators::NewGen
     end
 
     def initialize
+        @duplicate_check=Hash.new(false)
         @block=Fiber.new do
             begin
                 header,raw_fib,rest=""
@@ -106,6 +115,7 @@ class Producer < Generators::NewGen
                     f.preserve_length=true
                     f.basic_tests {|bs|
                         fuzzed_stream=word_stream[0..len_idx-1]+bs.to_s+word_stream[len_idx+1..-1]
+                        next if seen? fuzzed_stream
                         final=StringIO.new(Template.clone)
                         Ole::Storage.open(final) {|ole|
                             ole.file.open("WordDocument","wb+") {|io| io.write fuzzed_stream}
@@ -121,6 +131,7 @@ class Producer < Generators::NewGen
                         f.basic_tests(1024,false) {|fuzzed_sprm|
                             fuzzed=sprm_ary.map {|elem| elem==sprm ? fuzzed_sprm : elem}.join
                             fuzzed_stream=word_stream[0..len_idx]+fuzzed+word_stream[len_idx+fuzzed.length+1..-1]
+                            next if seen? fuzzed_stream
                             final=StringIO.new(Template.clone)
                             Ole::Storage.open(final) {|ole|
                                 ole.file.open("WordDocument","wb+") {|io| io.write fuzzed_stream}
