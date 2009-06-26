@@ -118,7 +118,6 @@ class Producer < Generators::NewGen
                     p sprm_ary
                     sprm_ary.each {|sprm|
                         f=Fuzzer.new(sprm)
-                        p f.count_tests(1024,false)
                         f.basic_tests(1024,false) {|fuzzed_sprm|
                             fuzzed=sprm_ary.map {|elem| elem==sprm ? fuzzed_sprm : elem}.join
                             fuzzed_stream=word_stream[0..len_idx]+fuzzed+word_stream[len_idx+fuzzed.length+1..-1]
