@@ -16,11 +16,11 @@ module WordStructures
                 unsigned buf, :opLen, 8, "Operand length"
                 @length_check=self.opLen
                 string buf, :operand, self.opLen*8, "Parameter"
-                group :sprastuff, :sgc, :opLen, :fSpec, :operand
+                group :sprastuff, :sgc, :opLen, :fSpec, :ispmd, :operand
             else
                 @length_check=spra_table[self.spra]
                 unsigned buf, :operand, spra_table[self.spra]*8, "Parameter"
-                group :sprastuff, :spra, :sgc, :operand
+                group :sprastuff, :spra, :sgc, :ispmd, :operand
             end
         }
     end
@@ -45,9 +45,9 @@ module WordStructures
                 string bitbuf, :contents, self.recLen*8, "Contents"
             end
             if self[:contents]
-                group :tv, :recType, :contents
+                group :tv, :recInstance, :recVer, :recType, :contents
             else
-                group :tl, :recType, :recLen
+                group :tl, :recInstance, :recVer, :recType, :recLen
             end
         }
     end

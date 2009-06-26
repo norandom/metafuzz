@@ -9,76 +9,22 @@ class Producer < Generators::NewGen
 
     Template=File.open( File.expand_path("~/fuzzserver/boof.doc"),"rb") {|io| io.read}
 
-    def hexdump(str)
-        ret=""
-        str.unpack('H*').first.scan(/.{2}/).each_slice(16) {|s| 
-            ret << "%-50s" % s.join(' ') 
-            ret << s.map {|e| e.hex}.pack('c*').tr("\000-\037\177-\377",'.')
-            ret << "\n"
-        }
-        ret
-    end
-
-    def dggdiff(old, new)
-
-        begin
-            puts "Diffing"
-            orig_file=old
-            corrupt_file=new
-            raw_fib=IO.read(orig_file,1472,512)
-            fib=WordStructures::WordFIB.new(raw_fib)
-            ole_old=Ole::Storage.open(orig_file,'rb')
-            table_stream_old=ole_old.file.read("1Table")
-            ole_old.close
-            ole_new=Ole::Storage.open(corrupt_file,'rb')
-            table_stream_new=ole_new.file.read("1Table")
-            ole_new.close
-            fc=:fcDggInfo
-            lcb=:lcbDggInfo
-            raw_old=table_stream_old[fib.send(fc),fib.send(lcb)]
-            raw_new=table_stream_new[fib.send(fc),fib.send(lcb)]
-            puts "Same" if raw_old==raw_new
-            dgg_parsed_old=[]
-            while raw_old.length > 0
-                dgg_parsed_old << WordStructures::WordDgg.new(raw_old)
-                if raw_old.length > 0
-                    dgg_parsed_old << Binstruct.new(raw_old.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
-                end
-            end
-            dgg_parsed_new=[]
-            while raw_new.length > 0
-                dgg_parsed_new << WordStructures::WordDgg.new(raw_new)
-                if raw_new.length > 0
-                    dgg_parsed_new << Binstruct.new(raw_new.slice!(0,1)) {|buf| unsigned buf, :foo, 8, "thing"}
-                end
-            end
-            dgg_parsed_old.zip(dgg_parsed_new) {|oldbs,newbs|
-                oldbs.inspect.zip(newbs.inspect) {|oldfield,newfield|
-                    unless oldfield==newfield
-                        #index=oldfield.match(/<IDX:(\d+)>/)[1].to_i
-                        #puts "Before..."
-                        #p oldbs.inspect[index-5..index-1]
-                        #puts "Changed.."
-                        p oldfield
-                        p newfield
-                        #puts "After..."
-                        #p oldbs.inspect[index+1..index+5]
-                    end
-                }
-
-            }
-        rescue
-            puts $!
-        end
+    def seen?( str )
+        hsh=Digest::MD5.hexdigest(str)
+        seen=@duplicate_check[hsh]
+        @duplicate_check[hsh]=true
+        @duplicate_check.shift if @duplicate_check.size > SEEN_LIMIT
+        seen
     end
 
     def initialize
+        @duplicate_check=Hash.new(false)
         @block=Fiber.new do
             begin
                 unmodified_file=StringIO.new(Template.clone)
-		    header=unmodified_file.read(512)
-		    raw_fib=unmodified_file.read(1472)
-		    rest=unmodified_file.read
+                header=unmodified_file.read(512)
+                raw_fib=unmodified_file.read(1472)
+                rest=unmodified_file.read
                 raise RuntimeError, "Data Corruption" unless header+raw_fib+rest == Template
                 fib=WordStructures::WordFIB.new(raw_fib.clone)
                 raise RuntimeError, "Data Corruption - fib.to_s not raw_fib" unless fib.to_s == raw_fib
@@ -112,15 +58,15 @@ class Producer < Generators::NewGen
                 raise RuntimeError, "Data Corruption - Binstruct.to_s not fuzztarget" unless dgg_parsed.map {|s| s.to_s}.join == fuzztarget
                 dgg_parsed.each {|bs|
                     typefixer=proc {|bs| bs.flatten.each {|f|
-                        if f.name==:recType
-                            f.set_value(f.get_value | 0xf000)
-                        end
-                    }
-                    bs
+                            if f.name==:recType
+                                f.set_value(f.get_value | 0xf000)
+                            end
+                        }
+                        bs
                     }
                     f=Fuzzer.new(bs,typefixer)
                     f.preserve_length=true
-			f.verbose=false
+                    f.verbose=false
                     #p f.count_tests(1024,false)
                     f.basic_tests(1024,false, START_AT) {|fuzz|
                         #head+fuzzed+rest
@@ -128,6 +74,7 @@ class Producer < Generators::NewGen
                         #raise RuntimeError, "DggFuzz: Dgg length mismatch" unless ts_gunk.length==1814
                         fuzzed_table=ts_head+ts_gunk+ts_rest
                         raise RuntimeError, "Dggfuzz: fuzzed table stream same as old one!" if fuzzed_table==table_stream
+                        next if seen? fuzzed_table
                         #write the modified stream into the temp file
                         unmodified_file.rewind
                         Ole::Storage.open(unmodified_file) {|ole|
@@ -137,21 +84,6 @@ class Producer < Generators::NewGen
                         }
                         unless (ts_gunk.length-fuzztarget.length) == 0
                             raise RuntimeError, "Dggfuzz: Fuzzer is set to preserve length, but delta !=0?"
-                            # Read in the new file contents with the modified table stream
-                            # so we can fix up the FIB pointers and lengths and such
-			    header=unmodified_file.read(512)
-			    raw_fib=unmodified_file.read(1472)
-			    rest=unmodified_file.read
-                            newfib=WordStructures::WordFIB.new(raw_fib)
-                            #adjust the lcb for this structure
-                            newfib.send((lcb.to_s+'=').to_sym, ts_gunk.length)
-                            #adjust the offsets for all subsequent structures
-                            fib.groups[:ol].each {|off,len|
-                                if (fib.send(off) > fib.send(fc)) and fib.send(len) > 0
-                                    newfib.send((off.to_s+'=').to_sym, fib.send(off)+length_delta)
-                                end
-                            }
-                            File.open(unmodified_file,"wb+") {|io| io.write header+newfib.to_s+rest}
                         end
                         #add to the queue
                         unmodified_file.rewind
