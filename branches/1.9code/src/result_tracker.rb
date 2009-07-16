@@ -1,5 +1,13 @@
 require File.dirname(__FILE__) + '/rtdbwrapper'
 
+# Just a quick wrapper, so I can change the underlying DB.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class ResultTracker
 
     def initialize(dbfile)

@@ -1,5 +1,5 @@
 # A collection of useful code bits that have been pilfered from various sources 
-# on the Interweb.
+# on the Interweb, none of which asserted copyright, so neither do I.
 
 class Object # :nodoc: all
     #Return the metaclass of an object.

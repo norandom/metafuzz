@@ -8,6 +8,17 @@ require 'wordstruct'
 require 'ole/storage'
 require 'mutations'
 
+# This is a fully working case generator. It mutates a template file by reading the FIB
+# and then looping through all the offset/length pairs (defined in the structure). Each
+# linked structure is read from the Table stream and then fed into a very simple string 
+# fuzzer. Then we adjust the offset/length stuff in the FIB if the length changed, pack
+# the file back up and send it.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class Producer < Generators::NewGen
 
     Template=File.open( File.expand_path('~/wordcrashes/boof.doc'),"rb") {|io| io.read}
@@ -50,7 +61,7 @@ class Producer < Generators::NewGen
                         # Read in the new file contents
                         header, raw_fib, rest=io.read(512), io.read(1472), io.read
                         newfib=WordStructures::WordFIB.new(raw_fib)
-                        #adjust the lcb
+                        #adjust the byte count for this structure
                         newfib.send((lcb.to_s+'=').to_sym, fuzz.length)
                         #adjust the offsets for all subsequent structures
                         delta=fuzz.to_s.length-fuzztarget.length

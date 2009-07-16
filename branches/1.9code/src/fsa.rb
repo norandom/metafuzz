@@ -59,10 +59,11 @@ require 'objhax'
 # Current State: {}
 #
 # ---
+# This file is part of the Metafuzz fuzzing framework.
 # Author: Ben Nagy
-# Copyright: Copyright (c) Ben Nagy, 2006.
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
 # License: All components of this framework are licensed under the Common Public License 1.0. 
-# Please read LICENSE.TXT for details. Or see RDoc for the file license.rb
+# http://www.opensource.org/licenses/cpl1.0.txt
 class FSA
 	
 	# start constructor methods

@@ -1,5 +1,16 @@
 require 'Win32API'
 
+# More nasty code. This uses window messages to try and kill off dialog boxes.
+# It doesn't care what they are, it just tries to get rid of them.
+#
+# This is the second of the two files that run alongside the fuzzclient.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
+
 BMCLICK=0x00F5
 WM_DESTROY=0x0010
 WM_COMMAND=0x111
@@ -25,7 +36,7 @@ def kill_dialog_boxes
         PostMessage.call(child_hwnd,WM_DESTROY,0,0)
       end
       # The script changes the caption, so this should only detect toplevel dialog boxes
-      # that pop up during open.
+      # that pop up during open before the main Word window.
       toplevel_box=FindWindow.call(0, "Microsoft Office Word")
       unless toplevel_box==0
         PostMessage.call(toplevel_box,WM_COMMAND,IDCANCEL,0)

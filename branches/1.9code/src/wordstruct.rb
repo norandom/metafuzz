@@ -1,4 +1,15 @@
 require 'binstruct'
+
+# A few structure definitions for messing with .doc files. Probably the most
+# important is the WordFIB, as it's the map to all the other structures in
+# the Table stream.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
+
 module WordStructures
 
     class WordSPRM < Binstruct

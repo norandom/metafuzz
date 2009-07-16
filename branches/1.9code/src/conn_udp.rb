@@ -4,6 +4,12 @@ require 'socket'
 #
 #Parameters: dest_host (string), dest_port (0-65535), source_port (0-65535, defaults to whatever source
 #port is supplied by the OS)
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 module CONN_UDP
     
     #These methods will override the stubs present in the Connector

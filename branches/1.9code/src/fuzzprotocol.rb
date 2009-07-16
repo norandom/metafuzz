@@ -2,6 +2,16 @@ require 'objhax'
 require 'json'
 require 'digest/md5'
 
+# This class just handles the serialization, the mechanics of the protocol itself
+# is "defined" in the FuzzClient / FuzzServer implementations. It is very lazy
+# which allows the protocol to be changed by simply changing the code at each peer.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class FuzzMessage
 
     # .new can take a Hash or YAML-dumped Hash, and any symbols not defined 
@@ -33,7 +43,6 @@ class FuzzMessage
         @msghash
     end
 
-    # Users should probably just instantiate a new object with YAML data
     def load_json(json_data)
         begin
             decoded=JSON::load(json_data)
@@ -50,14 +59,3 @@ class FuzzMessage
         @msghash.to_json
     end
 end
-
-=begin
-f=FuzzMessage.new({'verb'=>"NEWDATA",'message'=>"ELEPHANTS RULE"})
-dumped=f.to_yaml
-p dumped.class
-tst=YAML::load(dumped)
-p tst
-g=FuzzMessage.new(dumped)
-p g
-p g.message
-=end

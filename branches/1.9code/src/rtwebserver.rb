@@ -4,6 +4,20 @@ require 'json'
 require 'rtdbwrapper'
 require 'fileutils'
 
+# This is a (very) quick webserver that allows the client to query
+# the results DB via a REST style interface  at 
+# http://<server>/result/23356 etc etc. The intention was to allow
+# adaptive fuzzing by building production clients that would modify
+# their behaviour based on the results of each test, but I don't
+# do my case generation that way, myself. Might be dusted off and
+# improved, one of these days.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
+
 FileUtils.copy("/dev/shm/metafuzz.db", "/dev/shm/metafuzz_ro.db")
 DB=RTDB.new("/dev/shm/metafuzz_ro.db")
 

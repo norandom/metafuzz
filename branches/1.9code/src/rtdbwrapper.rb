@@ -1,6 +1,15 @@
 require 'rubygems'
 require 'sequel'
 
+# This is a fairly useless DB connector. I don't actually use the REST
+# interface in anger anymore, so it has lacked attention.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class RTDB
 
     attr_reader :summary

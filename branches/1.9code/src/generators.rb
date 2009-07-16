@@ -1,5 +1,29 @@
 require 'digest/md5'
 
+#This module implements the Ruby 1.8 Generator class for 1.9, using fibers.
+#Mainly, it is for my own Generators, and isn't supposed to be a true language
+#addition / fix.It is massively less suckful in terms of memory leakage and 
+#speed, but I'm sure there is room for improvement. One limitation is that 
+#when you define your subclasses of NewGen you need to define a block in your
+#initialize function in a specific way for .next? to work cleanly:
+#Example:
+# 
+#   class Foo < NewGen
+#       def initialize (*args)
+#           @block=Fiber.new do
+#               # code here
+#               nil # nil or false at the end of the block
+#           end
+#           super 
+#       end
+#   end
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
+
 module Generators
     class NewGen
 
@@ -187,6 +211,8 @@ module Generators
     #plus a few corner cases like 1000, 0001, 1110, 0111
     #0101, 1010 etc
     #
+    #I am presently more inclined to use RollingCorrupt in my own work.
+    #
     # require 'generators'
     # g=Generators::BinaryCornerCases.new(16)
     # g.to_a.map {|case| "%.16b" % case}
@@ -262,6 +288,11 @@ module Generators
         end
     end
 
+    #In: A NewGen
+    #Out: A NewGen which strips duplicate output from the first
+    #generator by using a 10,000 item ring buffer of MD5 hashes.
+    #
+    #Might eat too much RAM, and/or be slow, YMMV.
     class DuplicateFilter < NewGen
 
         def hash( item )
@@ -291,6 +322,8 @@ module Generators
         end
     end
 
+    #Produces (count) random numbers of (bitlength).
+    #Looks dumb, but can be useful as a primitive.
     class Rand < NewGen
         def initialize ( bitlength, count )
             @bitlength, @count=bitlength, count
@@ -306,12 +339,17 @@ module Generators
     end
     # Parameters: String, Bitlength, Stepsize,Random Cases=0
     # Will corrupt Bitlength bits of the provided string by substituting each of the binary outputs
-    # of the BinaryCornerCases generator. At each step it will advance the 'rolling window' that is
+    # of the BinaryCornerCases generator and also adding and subtracting 1..9 from the existing value. 
+    # If the bitlength is 16, 32 or 64 and the endianness is specified as :little, it will byteswap for you
+    # both ways.
+    # At each step it will advance the 'rolling window' that is
     # being corrupted by Stepsize bits. So, with Bitlength 11 and Stepsize 3 it will first corrupt bits
     # [0..10] then bits [3..13] and so on. Note that it is assumed that the string is packed already, so it 
     # will be unpacked to binary, corrupted at the binary level and then repacked.
     # If an integer is specified for the Random Cases parameter then the generator will also add that number
     # of random binary strings to the corruption
+    # This generator also works quite well for packed integers, by just specifying a bitlength and stepsize
+    # identical to the length of the integer.
     class RollingCorrupt < NewGen
         
         def byteswap_bitstring( bitstring )
@@ -335,6 +373,7 @@ module Generators
                 rng.step(stepsize) {|idx|
                     gFinal.rewind
                     # Add / Subtract 1..9 from the value that was there
+                    # This code is a little puke-worthy.
                     (1..9).each {|num|
                         out_str=@binstr.clone
                         to_change=out_str[idx..idx+(bitlength-1)]
@@ -371,6 +410,7 @@ module Generators
 
     end
 
+    #Removes the middle third of a given string until the final length is 2. 
     class Chop < NewGen
         def remove_middle_third( instr )
             len=instr.length
@@ -400,6 +440,9 @@ module Generators
         end
     end
 
+    # In: value, limit, *transforms
+    # Outputs (value), (limit) times or forever when limit==-1. 
+    # However, using transforms can drastically modify the behaviour of this generator.
     class Static < NewGen
 
         def initialize (*args)
