@@ -3,6 +3,18 @@ require 'win32/process'
 require 'win32ole'
 require 'fileutils'
 
+# Some fairly quick and dirty code to kill off stale word processes
+# and clean up temp files. Runs while the fuzzer is running.
+#
+# You can adjust the sleep time to have it be more aggressive in killing
+# old processes, but you risk killing things that might be halfway through
+# crashing.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 
 def get_process_array(wmi)
     processes=wmi.ExecQuery("select * from win32_process where name='WINWORD.EXE'")

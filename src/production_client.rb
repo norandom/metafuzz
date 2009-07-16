@@ -7,6 +7,22 @@ require 'objhax'
 require 'base64'
 require 'zlib'
 
+# This class is a generic class that can be inherited by task specific production clients, to 
+# do most of the work. It speaks my own Metafuzz protocol which is pretty much JSON
+# serialized hashes, containing a verb and other parameters.
+#
+# In the overall structure, one or more of these will feed test cases to the fuzz server.
+# In a more complicated implementation it would also be able to adapt, based on the results.
+#
+# To be honest, if you don't understand this part, (which is completely fair) 
+# you're better off reading the EventMachine documentation, not mine.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class ProductionClient < EventMachine::Connection
 
 	def self.setup( config_hsh={})

@@ -20,6 +20,12 @@ require 'thread'
 #When finished with a Connector object you should call Connector#close, otherwise the
 #receive thread will hang around which can cause large memory leaks if you create many
 #Connectors.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class Connector
 
     QUEUE_MAXLEN=128

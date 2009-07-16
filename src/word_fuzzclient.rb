@@ -1,10 +1,28 @@
-system "gem.bat install c:\\src\\json*"
+# This is a bit of a mishmash - if you set up your fuzzclients correctly you can skip a
+# lot of the commands and stuff. The main thing this class
+# does is overload the deliver method in the FuzzClient class to do the Word specific
+# delivery stuff.  This is the key file that would have to be rewritten to change fuzzing
+# targets.
+#
+# In my setup, this file is invoked by a batch script that runs at system startup, and
+# copies the neccessary scripts from a share, so to upgrade this code you can just change
+# the shared copy and reboot all your fuzzclients.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
+
 require 'fuzz_client'
 require 'connector'
 require 'conn_office'
 require 'conn_cdb'
 require 'win32/registry'
 
+# Clear the registry keys that remember crash files at the start of each run. Thus, not a
+# bad idea to reboot every week or two, so this script will restart.
 begin
     Win32::Registry::HKEY_CURRENT_USER.open('SOFTWARE\Microsoft\Office\12.0\Word\Resiliency',Win32::Registry::KEY_WRITE) do |reg|
         reg.delete_key "StartupItems" rescue nil
@@ -72,9 +90,7 @@ class WordFuzzClient < FuzzClient
             # -snul - don't load symbols
             # -c  - initial command
             # sxe -c "!exploitable -m;g" av - run the MS !exploitable windbg extension
-            # -hd don't use the debug heap
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
-            # -x ignore first chance av exceptions
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -xi ld -p #{current_pid}")
 			debugger.puts "!load winext\\msec.dll"
@@ -82,11 +98,12 @@ class WordFuzzClient < FuzzClient
 			debugger.puts "g"
             begin
                 @word.deliver this_test_filename
+                # As soon as the deliver method doesn't raise an exception, we lose interest.
                 status='success'
                 print '.'
             rescue
                 # check for crashes
-				sleep(0.1)
+                sleep(0.1)
                 if debugger.crash?
                     status='crash'
                     crash_details=debugger.dq_all.join
@@ -100,7 +117,7 @@ class WordFuzzClient < FuzzClient
             # This should kill the winword process as well
             # Clean up the connection object
             @word.close rescue nil
-			debugger.close rescue nil
+            debugger.close rescue nil
             clean_up(this_test_filename) 
             [status,crash_details]
         rescue
@@ -119,7 +136,6 @@ else
 	raise RuntimeError, "WordFuzzClient: Couldn't find the ramdisk."
 end
 WordFuzzClient.setup('server_ip'=>server, 'work_dir'=>workdir)
-puts "Modified CDB command line"
 
 EventMachine::run {
     system("start ruby wordslayer.rb")

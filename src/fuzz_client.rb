@@ -8,6 +8,23 @@ require 'base64'
 require 'zlib'
 
 
+# This class is a generic class that can be inherited by task specific fuzzclients, to 
+# do most of the work. It speaks my own Metafuzz protocol which is pretty much JSON
+# serialized hashes, containing a verb and other parameters.
+#
+# In the overall structure, there will be one of these processes running on each
+# fuzzclient handling the delivery of the test cases to the target and sending 
+# back the results.
+#
+# To be honest, if you don't understand this part, (which is completely fair) 
+# you're better off reading the EventMachine documentation, not mine.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class FuzzClient < EventMachine::Connection
 
 	VERSION="1.1.8"

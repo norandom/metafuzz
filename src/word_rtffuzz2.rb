@@ -3,6 +3,17 @@ require 'fuzzer'
 require 'generators'
 require 'digest/md5'
 
+# This is a working case generator for RTF (not a great one, but it still
+# generates some crashes). All it does is look for integers and hexstring
+# blobs, and messes with them. Because RTF is ASCII not packed binary I 
+# need to jump through a few hoops since my generators are designed for
+# packed data.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class Producer < Generators::NewGen
 
     SEEN_LIMIT=5000
@@ -68,9 +79,9 @@ class Producer < Generators::NewGen
                 end
                 while fuzzgen.next?
                     substring_array[i]=fuzzgen.next
-		    puts substring_array[i-1..i+1].join
                     fuzzed_string=substring_array.join
                     next if seen? fuzzed_string
+		    puts substring_array[i-1..i+1].join
                     Fiber.yield fuzzed_string
                 end
                 substring_array[i]=saved_value

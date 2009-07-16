@@ -9,19 +9,15 @@ require 'win32/process'
 #Parameters: For now, the full command line EXCLUDING the path to cdb itself as a string. 
 #Sugar may follow later. Remember that program names that include spaces need to be 
 #enclosed in quotes \"c:\\Program Files [...] \" etc.
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 module CONN_CDB
 
 CDB_PATH="\"C:\\Program Files\\Debugging Tools for Windows (x86)\\cdb.exe\" "
-
-    #These methods will override the stubs present in the Connector
-    #class, and implement the protocol specific functionality for 
-    #these generic functions.
-    #
-    #Arguments required to set up the connection are stored in the
-    #Connector instance variable @module_args.
-    #
-    #Errors should be handled at the Module level (ie here), since Connector
-    #just assumes everything is going to plan.
 
     #Set up a new socket.
     def establish_connection

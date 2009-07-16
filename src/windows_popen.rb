@@ -1,4 +1,13 @@
 # Mostly stolen from Simon Kroger, comp.lang.ruby post Sep 12, 2005.
+# I fixed the handle leaks and also added the CREATE_NEW_PROCESS_GROUP stuff
+# which allows me to send a break to the debugger.
+
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 
 module WindowsPipe
     require 'Win32API' 

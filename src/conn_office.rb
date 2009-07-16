@@ -6,6 +6,12 @@ require 'win32/process'
 #Parameters: Application Name (string) [word,excel,powerpoint etc], Temp File Directory (String).
 #Currently the calling code is expected to manage the files, so the deliver method takes a filename as
 #its parameter
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 module CONN_OFFICE
 
     #These methods will override the stubs present in the Connector
@@ -89,10 +95,7 @@ module CONN_OFFICE
             begin
                 @app.Quit if is_connected?
             rescue
-                unless Process.kill(1,@pid).include?(@pid)
-                    sleep(0.5)
-                    Process.kill(9,@pid).include(@pid)
-                end
+                Process.kill(9,@pid)
             end
             @app.ole_free rescue nil
         ensure

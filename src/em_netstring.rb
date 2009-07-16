@@ -1,3 +1,12 @@
+# I suspect I stole some of this code, but I can't remember where from, sorry.
+# In any case, it needed lots of modification to work with EventMachine.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class NetStringTokenizer
     BadStringError = Class.new(StandardError)
     InvalidDataLengthError = Class.new(BadStringError)

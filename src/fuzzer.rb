@@ -2,11 +2,22 @@ require 'binstruct'
 require File.dirname(__FILE__) + '/generators.rb'
 require File.dirname(__FILE__) + '/mutations.rb'
 
+#IMHO the core of any fuzzer is the structure definition code. This fuzzer works best when 
+#used with Binstruct, which is my version. It can also be used with strings, in case you're
+#too lazy or busy to parse out a structure and just want to get started quickly.
+#
 #The Fuzzer class is a simple metafuzzing example. It will attempt to send sensible fuzzing
 #output based on the types of fields within the structure. Fuzzer allows the user to specify 'fixup'
 #code blocks that will be run in order, using output chaining, on the fuzzed structure element. 
 #Some examples might be blocks that encrypt or encode the data, correct length fields, calculate
 #checksums or simply add to the confusion by randomly messing with the output.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class Fuzzer
     include Mutations
     self.extend Mutations
@@ -22,6 +33,8 @@ class Fuzzer
     attr_reader :check
     attr_accessor :preserve_length, :verbose
 
+    #By default, this will cut the string into 8 StringFields and produce a
+    #Binstruct (which you can modify later in your own code, of course).
     def self.string_to_binstruct( str, granularity=8, endian=:big )
         strclone=str.clone
         chunk_array=[]
@@ -59,6 +72,10 @@ class Fuzzer
         @check=@binstruct.to_s
     end
 
+    # Sometimes, if your delivery is going to be very slow, you'd like to find out
+    # how many cases your test generator is going to produce before you get started.
+    # Because of the dynamic nature of metafuzz and my addiction to 'lazy' generation,
+    # it's not easy to calculate this, so we just run through them.
     def count_tests(overflow_maxlen=5000, send_unfixed=true, skip=0, fuzzlevel=1)
         num_tests=0
         was_true=@verbose
@@ -94,6 +111,8 @@ class Fuzzer
         if skip > 0
             puts "Skipping #{skip} tests." if @verbose
         end
+        # This block is used below. It works on one field. The reason we define it as a block
+        # is to make it cleaner when we're recursing through nested structures.
         fuzzblock=proc do |current_field| # remember that it's possible for current_field to be not a Fields::Field
 
             puts "Starting new field" if @verbose
@@ -235,13 +254,15 @@ class Fuzzer
             end
             puts "inject done" if @verbose
         end # fuzzblock
+        # Phase 1:
         # Run the fuzzblock, defined above, on each field in the structure, 
-        # flattening out nested substructs.
+        # recursing though nested substructs.
         if @binstruct.respond_to? :deep_each
             @binstruct.flatten.each &fuzzblock
         else
             @binstruct.fields.each &fuzzblock
         end
+        # Phase 2:
         # Test all combinations of fields that have been linked with the group constructor
         # during structure definition. Also recurse into substructs.
         if @grouplink
@@ -288,16 +309,4 @@ class Fuzzer
             cartprod_block.call(@binstruct)
         end
     end	# basic_tests
-end
-
-if __FILE__==$0
-    puts "Starting tests..."
-    require 'fuzzer'
-    require 'wordstruct'
-    b=WordStructures::WordSPRM.new("\x01\x08\x01")
-    bs=Binstruct.new("\x02\x01") {|buf| endian :little;string buf, :foo, 16, "thing"}
-    f=Fuzzer.new(bs)
-    b.deep_each {|f| p f.name}
-    #f.preserve_length=true
-    f.basic_tests(10,false) {|t| p t}
 end

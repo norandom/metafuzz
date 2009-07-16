@@ -3,18 +3,17 @@ require 'socket'
 #Establish a 'connection' over raw IP. The OS will provide the
 #IP header.
 #
+#Bugs: the read assumes a 20 byte IP header. I never fuzzed anything
+#where that was important, sorry.
+#
 #Parameters: dest_host (string), ip_proto (0-255 or Socket constant)
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 module CONN_RAWIP
-
-    #These methods will override the stubs present in the Connector
-    #class, and implement the protocol specific functionality for 
-    #these generic functions.
-    #
-    #Arguments required to set up the connection are stored in the
-    #Connector instance variable @module_args.
-    #
-    #Errors should be handled at the Module level (ie here), since Connector
-    #just assumes everything is going to plan.
 
     #Set up a new socket.
     def establish_connection

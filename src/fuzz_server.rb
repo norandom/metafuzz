@@ -5,6 +5,23 @@ require File.dirname(__FILE__) + '/fuzzprotocol'
 require File.dirname(__FILE__) + '/result_tracker'
 require 'objhax'
 
+# This class is a generic class that can be inherited by task specific fuzzservers, to 
+# do most of the work. It speaks my own Metafuzz protocol which is pretty much JSON
+# serialized hashes, containing a verb and other parameters.
+#
+# In the overall structure, this class is the broker between the production clients
+# and the fuzz clients. It is single threaded, using the Reactor pattern, to make it
+# easier to debug.
+#
+# To be honest, if you don't understand this part, (which is completely fair) 
+# you're better off reading the EventMachine documentation, not mine.
+#
+# ---
+# This file is part of the Metafuzz fuzzing framework.
+# Author: Ben Nagy
+# Copyright: Copyright (c) Ben Nagy, 2006-2009.
+# License: All components of this framework are licensed under the Common Public License 1.0. 
+# http://www.opensource.org/licenses/cpl1.0.txt
 class TestCase < EventMachine::DefaultDeferrable
 	attr_reader :data,:crc32,:encoding
 	def initialize( data, crc, encoding=nil )
