@@ -322,6 +322,21 @@ module Generators
         end
     end
 
+    #Enumerates all binary strings up to length
+    #(bitlength). Useful as a primitive.
+    class EnumerateBits < NewGen
+        def initialize ( bitlength )
+            @bitlength, @count=bitlength
+            @block=Fiber.new do
+                0.upto (2**@bitlength)-1 do |i|
+                    Fiber.yield "%.#{bitlength}b" % i
+                end
+                false
+            end 
+            super
+            @alive=false if bitlength==0
+        end
+    end
     #Produces (count) random numbers of (bitlength).
     #Looks dumb, but can be useful as a primitive.
     class Rand < NewGen

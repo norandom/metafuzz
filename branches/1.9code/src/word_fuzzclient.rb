@@ -93,9 +93,9 @@ class WordFuzzClient < FuzzClient
             # -pb don't request an initial break (not used now, cause we need the break so we can read the initial command)
             # -xi ld ignore module loads
             debugger=Connector.new(CONN_CDB,"-snul -xi ld -p #{current_pid}")
-			debugger.puts "!load winext\\msec.dll"
-			debugger.puts "sxe -c \"r;!exploitable -m;q\" av"
-			debugger.puts "g"
+            debugger.puts "!load winext\\msec.dll"
+            debugger.puts "sxe -c \"r;!exploitable -m;q\" av"
+            debugger.puts "g"
             begin
                 @word.deliver this_test_filename
                 # As soon as the deliver method doesn't raise an exception, we lose interest.
@@ -129,11 +129,11 @@ end
 
 server="192.168.242.101"
 if File.directory? 'R:/'
-	workdir='R:/fuzzclient'
+    workdir='R:/fuzzclient'
 elsif File.directory? "E:/"
-	workdir="E:/fuzzclient"
+    workdir="E:/fuzzclient"
 else
-	raise RuntimeError, "WordFuzzClient: Couldn't find the ramdisk."
+    raise RuntimeError, "WordFuzzClient: Couldn't find the ramdisk."
 end
 WordFuzzClient.setup('server_ip'=>server, 'work_dir'=>workdir)
 
