@@ -33,16 +33,29 @@ class TestCase < EventMachine::DefaultDeferrable
 	alias :get_new_case :succeed
 end
 
+class DelayedResult < EventMachine::DefaultDeferrable
+	attr_reader :server_id
+	def initialize( server_id )
+            @server_id=server_id
+		super()
+	end
+	alias :send_result :succeed
+end
+
 class FuzzServer < EventMachine::Connection
 
 	WaitQueue=[]
 	DeliveryQueue=[]
+        DelayedResultQueue=[]
 	def self.waiting_for_data
 		WaitQueue
 	end
 	def self.delivery_queue
 		DeliveryQueue
 	end
+        def self.delayed_result_queue
+            DelayedResultQueue
+        end
 	def self.setup( config_hsh={})
 		default_config={
 			'agent_name'=>"SERVER",
@@ -95,6 +108,10 @@ class FuzzServer < EventMachine::Connection
 			File.open(crashfile_path, "wb+") {|io| io.write(crashfile)}
 		end
 		self.class.result_tracker.add_result(Integer(result_id),result_status,detail_path||=nil,crashfile_path||=nil)
+                self.class.delayed_result_queue.select {|dr| dr.server_id==msg.id}.each {|dr| 
+                        dr.send_result(result_status)
+                        self.class.delayed_result_queue.delete dr
+                }
 	end
 
 	# Only comes from fuzzclients.
@@ -125,6 +142,11 @@ class FuzzServer < EventMachine::Connection
 				send_msg('verb'=>'ack_case', 'id'=>msg.id)
 				send_msg('verb'=>'server_ready','server_id'=>server_id)
 			end
+                        dr=DelayedResult.new(server_id)
+                        dr.callback do |result|
+                            send_msg('verb'=>'result','result'=>result,'id'=>msg.id,'server_id'=>server_id)
+                        end
+                        self.class.delayed_result_queue << dr
 			if waiting=self.class.waiting_for_data.shift
 				waiting.succeed(server_id,test_case)
 			else
